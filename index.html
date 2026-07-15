@@ -1,285 +1,95 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tennisdubbels</title>
-  <style>
-    :root {
-      font-family: Arial, sans-serif;
-      color: #1f2937;
-      background: #f3f4f6;
-    }
-    body {
-      margin: 0;
-      padding: 18px;
-    }
-    .app {
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    h1 { margin-bottom: 4px; }
-    .sub { margin-top: 0; color: #6b7280; }
-    .tabs {
-      display: flex;
-      gap: 8px;
-      margin: 18px 0;
-    }
-    .tabs button {
-      flex: 1;
-    }
-    .card {
-      background: white;
-      border-radius: 14px;
-      padding: 18px;
-      margin: 14px 0;
-      box-shadow: 0 2px 10px rgba(0,0,0,.08);
-    }
-    label {
-      display: block;
-      margin: 12px 0 6px;
-      font-weight: 700;
-    }
-    select, input[type="date"] {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 11px;
-      border: 1px solid #d1d5db;
-      border-radius: 9px;
-      font-size: 16px;
-    }
-    button {
-      border: 0;
-      border-radius: 9px;
-      padding: 11px 15px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      background: #2563eb;
-      color: white;
-      margin: 8px 6px 0 0;
-    }
-    button.no { background: #dc2626; }
-    button.secondary { background: #6b7280; }
-    .hidden { display: none; }
-    .notice {
-      padding: 12px;
-      border-radius: 9px;
-      background: #eff6ff;
-      margin-top: 12px;
-    }
-    .success { background: #dcfce7; }
-    .warning { background: #fef3c7; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 12px;
-    }
-    th, td {
-      text-align: left;
-      padding: 10px;
-      border-bottom: 1px solid #e5e7eb;
-    }
-    .match {
-      margin-top: 12px;
-      padding: 12px;
-      background: #f8fafc;
-      border-left: 5px solid #2563eb;
-      border-radius: 8px;
-    }
-    .small {
-      font-size: 14px;
-      color: #6b7280;
-    }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tiebreak-opstelling</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
-    <h1>🎾 Tennisdubbels</h1>
-    <p class="sub">Dinsdagavond 20:00–21:30 · twee tiebreaks</p>
+<div class="app">
+  <h1>🎾 Tiebreak-opstelling</h1>
+  <p class="sub">Dinsdag 20:00–21:30 · twee tiebreaks</p>
 
-    <div class="tabs">
-      <button onclick="showTab('player')">Deelnemer</button>
-      <button class="secondary" onclick="showTab('organizer')">Organisator</button>
-    </div>
-
-    <section id="playerTab" class="card">
-      <h2>Geef je beschikbaarheid door</h2>
-
-      <label for="playDate">Dinsdag</label>
-      <input id="playDate" type="date">
-
-      <label for="playerNumber">Kies je deelnemersnummer</label>
-      <select id="playerNumber"></select>
-
-      <button onclick="saveAvailability('yes')">Ja, ik doe mee</button>
-      <button class="no" onclick="saveAvailability('no')">Nee, ik kan niet</button>
-
-      <div id="playerMessage" class="notice">Kies je nummer en geef je keuze door.</div>
-    </section>
-
-    <section id="organizerTab" class="card hidden">
-      <h2>Overzicht organisator</h2>
-      <p class="small">Deze eenvoudige versie bewaart keuzes alleen in deze browser.</p>
-
-      <label for="organizerDate">Dinsdag</label>
-      <input id="organizerDate" type="date" onchange="renderOverview()">
-
-      <div id="overview"></div>
-
-      <button onclick="makeSchedule()">Maak deelnemersveld</button>
-      <button class="secondary" onclick="clearDate()">Wis deze week</button>
-
-      <div id="scheduleResult" class="notice">Nog geen indeling gemaakt.</div>
-      <div id="matches"></div>
-    </section>
+  <div class="tabs">
+    <button onclick="showTab('player')">Deelnemer</button>
+    <button class="secondary" onclick="showTab('organizer')">Organisator</button>
+    <button class="secondary" onclick="showTab('management')">Spelers beheren</button>
   </div>
 
-  <script>
-    const TOTAL_PLAYERS = 10;
-    const playDate = document.getElementById('playDate');
-    const organizerDate = document.getElementById('organizerDate');
-    const playerNumber = document.getElementById('playerNumber');
+  <section id="playerTab" class="card">
+    <h2>Beschikbaarheid doorgeven</h2>
 
-    for (let i = 1; i <= TOTAL_PLAYERS; i++) {
-      const option = document.createElement('option');
-      option.value = i;
-      option.textContent = `Deelnemer ${i}`;
-      playerNumber.appendChild(option);
-    }
+    <label for="playDate">Dinsdag</label>
+    <input id="playDate" type="date">
 
-    function nextTuesday() {
-      const d = new Date();
-      const add = (2 - d.getDay() + 7) % 7;
-      d.setDate(d.getDate() + add);
-      return d.toISOString().slice(0, 10);
-    }
+    <label for="playerSelect">Speler</label>
+    <select id="playerSelect">
+      <option value="">Kies je naam</option>
+    </select>
 
-    playDate.value = nextTuesday();
-    organizerDate.value = nextTuesday();
+    <div class="row-actions">
+      <button class="green" onclick="saveAvailability('yes')">Ja, ik doe mee</button>
+      <button class="danger" onclick="saveAvailability('no')">Nee, ik kan niet</button>
+    </div>
 
-    function storageKey(date) {
-      return `tennisdubbels-${date}`;
-    }
+    <div id="playerMessage" class="notice">Kies je naam en geef je keuze door.</div>
+  </section>
 
-    function loadData(date) {
-      return JSON.parse(localStorage.getItem(storageKey(date)) || '{}');
-    }
+  <section id="organizerTab" class="card hidden">
+    <h2>Overzicht organisator</h2>
 
-    function saveData(date, data) {
-      localStorage.setItem(storageKey(date), JSON.stringify(data));
-    }
+    <label for="organizerDate">Dinsdag</label>
+    <input id="organizerDate" type="date">
 
-    function showTab(tab) {
-      document.getElementById('playerTab').classList.toggle('hidden', tab !== 'player');
-      document.getElementById('organizerTab').classList.toggle('hidden', tab !== 'organizer');
-      if (tab === 'organizer') {
-        organizerDate.value = playDate.value;
-        renderOverview();
-      }
-    }
+    <div id="overview" class="small">Overzicht wordt geladen...</div>
 
-    function saveAvailability(status) {
-      const date = playDate.value;
-      const player = playerNumber.value;
-      const data = loadData(date);
-      data[player] = status;
-      saveData(date, data);
+    <div class="row-actions">
+      <button onclick="makeSchedule()">Maak deelnemersveld</button>
+      <button class="secondary" onclick="loadOverview()">Vernieuwen</button>
+      <button class="green" onclick="shareWhatsApp()">Deel via WhatsApp</button>
+    </div>
 
-      const message = document.getElementById('playerMessage');
-      message.className = 'notice success';
-      message.textContent =
-        `Deelnemer ${player}: jouw keuze is opgeslagen als ` +
-        (status === 'yes' ? 'JA' : 'NEE') + '.';
-    }
+    <div id="scheduleResult" class="notice">Nog geen indeling gemaakt.</div>
+    <div id="matches"></div>
+  </section>
 
-    function renderOverview() {
-      const date = organizerDate.value;
-      const data = loadData(date);
-      let html = `
-        <table>
-          <thead>
-            <tr><th>Deelnemer</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-      `;
+  <section id="managementTab" class="card hidden">
+    <h2>Spelers beheren</h2>
+    <p class="small">Voeg spelers toe met naam, geslacht en KNLTB-dubbelrating.</p>
 
-      for (let i = 1; i <= TOTAL_PLAYERS; i++) {
-        const status = data[i];
-        let label = 'Nog niet ingevuld';
-        if (status === 'yes') label = '✅ Doet mee';
-        if (status === 'no') label = '❌ Kan niet';
-        html += `<tr><td>Deelnemer ${i}</td><td>${label}</td></tr>`;
-      }
+    <div class="grid">
+      <div>
+        <label for="firstName">Voornaam</label>
+        <input id="firstName" type="text" placeholder="Bijvoorbeeld Rinze">
+      </div>
+      <div>
+        <label for="lastName">Achternaam</label>
+        <input id="lastName" type="text" placeholder="Achternaam">
+      </div>
+      <div>
+        <label for="gender">Geslacht</label>
+        <select id="gender">
+          <option value="">Kies</option>
+          <option value="Man">Man</option>
+          <option value="Vrouw">Vrouw</option>
+          <option value="Anders">Anders / niet opgegeven</option>
+        </select>
+      </div>
+      <div>
+        <label for="rating">KNLTB-dubbelrating</label>
+        <input id="rating" type="number" min="1" max="9" step="0.1" placeholder="Bijvoorbeeld 7.3">
+      </div>
+    </div>
 
-      html += '</tbody></table>';
-      document.getElementById('overview').innerHTML = html;
-    }
+    <button onclick="addPlayer()">Speler toevoegen</button>
+    <div id="managementMessage" class="notice">Nog geen wijziging uitgevoerd.</div>
 
-    function shuffle(array) {
-      const copy = [...array];
-      for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-      }
-      return copy;
-    }
+    <h3>Huidige spelers</h3>
+    <div id="playerList">Spelers worden geladen...</div>
+  </section>
+</div>
 
-    function makeSchedule() {
-      const date = organizerDate.value;
-      const data = loadData(date);
-      const available = [];
-
-      for (let i = 1; i <= TOTAL_PLAYERS; i++) {
-        if (data[i] === 'yes') available.push(i);
-      }
-
-      const result = document.getElementById('scheduleResult');
-      const matches = document.getElementById('matches');
-      matches.innerHTML = '';
-
-      if (available.length < 4) {
-        result.className = 'notice warning';
-        result.textContent = `Er zijn ${available.length} spelers beschikbaar. Er zijn minimaal 4 nodig.`;
-        return;
-      }
-
-      const fieldSize = available.length >= 8 ? 8 : 4;
-      const shuffled = shuffle(available);
-      const selected = shuffled.slice(0, fieldSize);
-      const reserves = shuffled.slice(fieldSize);
-
-      result.className = 'notice success';
-      result.innerHTML =
-        `<strong>Deelnemersveld:</strong> ${selected.map(n => `Deelnemer ${n}`).join(', ')}` +
-        (reserves.length
-          ? `<br><strong>Reserve:</strong> ${reserves.map(n => `Deelnemer ${n}`).join(', ')}`
-          : '');
-
-      for (let i = 0; i < selected.length; i += 4) {
-        const [a, b, c, d] = selected.slice(i, i + 4);
-        const div = document.createElement('div');
-        div.className = 'match';
-        div.innerHTML = `
-          <strong>Baan ${i / 4 + 1}</strong><br>
-          Tiebreak 1: Deelnemer ${a} & Deelnemer ${b}
-          tegen Deelnemer ${c} & Deelnemer ${d}<br>
-          Tiebreak 2: Deelnemer ${a} & Deelnemer ${c}
-          tegen Deelnemer ${b} & Deelnemer ${d}
-        `;
-        matches.appendChild(div);
-      }
-    }
-
-    function clearDate() {
-      localStorage.removeItem(storageKey(organizerDate.value));
-      renderOverview();
-      document.getElementById('scheduleResult').className = 'notice';
-      document.getElementById('scheduleResult').textContent = 'Deze week is gewist.';
-      document.getElementById('matches').innerHTML = '';
-    }
-
-    renderOverview();
-  </script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
