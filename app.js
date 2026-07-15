@@ -1,308 +1,87 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
-import {
-  getFirestore, collection, addDoc, deleteDoc, doc,
-  onSnapshot, setDoc, getDocs
-} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, onSnapshot, writeBatch, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBIG5j_8pHr5C1KlFuG6lG0WunlUR8EJFs",
-  authDomain: "tiebreak-opstelling.firebaseapp.com",
-  projectId: "tiebreak-opstelling",
-  storageBucket: "tiebreak-opstelling.firebasestorage.app",
-  messagingSenderId: "363554771251",
-  appId: "1:363554771251:web:811ab3b99099fe4b1dee46"
-};
+const firebaseConfig={apiKey:"AIzaSyBIG5j_8pHr5C1KlFuG6lG0WunlUR8EJFs",authDomain:"tiebreak-opstelling.firebaseapp.com",projectId:"tiebreak-opstelling",storageBucket:"tiebreak-opstelling.firebasestorage.app",messagingSenderId:"363554771251",appId:"1:363554771251:web:811ab3b99099fe4b1dee46"};
+const app=initializeApp(firebaseConfig), db=getFirestore(app);
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+let players=[], dates=[], activeDate="", responses={}, eventSettings={courts:5,start:"20:00",end:"21:30"}, selectedIds=[], reserveIds=[], schedule=[], importRows=[];
+const SITE_URL="https://tiebreak-opstelling.netlify.app";
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+function toast(msg){const e=$("#toast");e.textContent=msg;e.classList.add("show");setTimeout(()=>e.classList.remove("show"),2600)}
+function esc(v=""){return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;")}
+function isoLocal(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
+function upcomingTuesdays(){const now=new Date(),day=now.getDay();let add=(2-day+7)%7;if(day===2&&now.getHours()>=21)add=7;const a=new Date(now);a.setDate(now.getDate()+add);const b=new Date(a);b.setDate(a.getDate()+7);return [isoLocal(a),isoLocal(b)]}
+function formatDate(iso){return new Intl.DateTimeFormat("nl-NL",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(new Date(`${iso}T12:00:00`))}
+function fullName(p){return `${p.firstName||""} ${p.lastName||""}`.trim()}
+function displayName(p){const sameFirst=players.filter(x=>(x.firstName||"").toLowerCase()===(p.firstName||"").toLowerCase());if(sameFirst.length===1)return p.firstName;const sameFull=players.filter(x=>fullName(x).toLowerCase()===fullName(p).toLowerCase());return sameFull.length===1?fullName(p):`${fullName(p)} (nr. ${p.number})`}
+function playerById(id){return players.find(p=>p.id===id)}
+function rating(p){const n=Number(p?.rating);return Number.isFinite(n)?n:9}
+function log(action,details=""){addDoc(collection(db,"logs"),{action,details,createdAt:new Date().toISOString()}).catch(()=>{})}
 
-const playDate = document.getElementById("playDate");
-const organizerDate = document.getElementById("organizerDate");
-const playerSelect = document.getElementById("playerSelect");
+$$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');$$('.tab-panel').forEach(x=>x.classList.add('hidden'));$(`#${b.dataset.tab}`).classList.remove('hidden');if(b.dataset.tab==='statistics')renderStats()});
 
-let players = [];
-let currentScheduleText = "";
+onSnapshot(collection(db,"players"),snap=>{players=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.number??9999)-(b.number??9999));$("#connectionBadge").textContent="Online";renderAll()},()=>{$("#connectionBadge").textContent="Verbindingsfout"});
 
-function nextTuesday(){
-  const d = new Date();
-  const add = (2 - d.getDay() + 7) % 7;
-  d.setDate(d.getDate() + add);
-  return d.toISOString().slice(0,10);
-}
+function renderAll(){dates=upcomingTuesdays();renderPlayerSelect();renderParticipantWeeks();renderOrganizerDates();renderPlayers();renderStats()}
+function renderPlayerSelect(){const s=$("#participantPlayer"),cur=s.value;s.innerHTML='<option value="">Kies je naam</option>'+players.map(p=>`<option value="${p.id}">${esc(displayName(p))} · nr. ${p.number}</option>`).join('');if(players.some(p=>p.id===cur))s.value=cur}
+$("#participantPlayer").onchange=renderParticipantWeeks;
 
-playDate.value = nextTuesday();
-organizerDate.value = nextTuesday();
+async function getResponses(date){const snap=await getDocs(collection(db,"playingDates",date,"responses"));const out={};snap.forEach(d=>out[d.id]=d.data().status);return out}
+async function setResponse(date,pid,status,by="deelnemer"){const ref=doc(db,"playingDates",date,"responses",pid);if(status==="")await deleteDoc(ref).catch(()=>{});else await setDoc(ref,{playerId:pid,status,updatedAt:new Date().toISOString(),updatedBy:by});log("Beschikbaarheid gewijzigd",`${displayName(playerById(pid))}: ${status||"niet ingevuld"} voor ${date}`)}
 
-window.showTab = function(tab){
-  document.getElementById("playerTab").classList.toggle("hidden", tab !== "player");
-  document.getElementById("organizerTab").classList.toggle("hidden", tab !== "organizer");
-  document.getElementById("managementTab").classList.toggle("hidden", tab !== "management");
-  if(tab === "organizer") loadOverview();
-};
+function groupNames(map,status){return players.filter(p=>map[p.id]===status).map(displayName)}
+async function renderParticipantWeeks(){const pid=$("#participantPlayer").value;const box=$("#participantWeeks");box.innerHTML='<p class="muted">Laden…</p>';const cards=[];for(const date of dates){const map=await getResponses(date);const current=map[pid]||"";const yes=groupNames(map,"yes"),no=groupNames(map,"no"),blank=players.filter(p=>!map[p.id]).map(displayName);cards.push(`<article class="week-card"><h3>${esc(formatDate(date))}</h3>${pid?`<div class="status-buttons"><button class="yes ${current==='yes'?'active':''}" data-date="${date}" data-status="yes">✅ Ik doe mee</button><button class="no ${current==='no'?'active':''}" data-date="${date}" data-status="no">❌ Ik kan niet</button><button class="blank ${!current?'active':''}" data-date="${date}" data-status="">⏳ Nog niet ingevuld</button></div>`:'<p class="muted">Kies eerst je naam.</p>'}<div class="people-groups"><div><strong>🟢 Aangemeld (${yes.length})</strong><br>${esc(yes.join(', ')||'Niemand')}</div><div><strong>🔴 Kan niet (${no.length})</strong><br>${esc(no.join(', ')||'Niemand')}</div><div><strong>🟡 Nog niet gereageerd (${blank.length})</strong><br>${esc(blank.join(', ')||'Niemand')}</div></div></article>`)}box.innerHTML=cards.join('');box.querySelectorAll('[data-status]').forEach(b=>b.onclick=async()=>{if(!pid)return;await setResponse(b.dataset.date,pid,b.dataset.status);renderParticipantWeeks();toast('Keuze opgeslagen')})}
 
-function fullName(p){
-  return `${p.firstName} ${p.lastName}`.trim();
-}
+function renderOrganizerDates(){const s=$("#organizerDate"),cur=s.value;s.innerHTML=dates.map(d=>`<option value="${d}">${esc(formatDate(d))}</option>`).join('');s.value=dates.includes(cur)?cur:dates[0];activeDate=s.value;s.onchange=loadOrganizer;loadOrganizer()}
+async function loadOrganizer(){activeDate=$("#organizerDate").value;responses=await getResponses(activeDate);const settingsSnap=await getDoc(doc(db,"playingDates",activeDate));eventSettings=settingsSnap.exists()?{courts:5,start:"20:00",end:"21:30",...settingsSnap.data()}:{courts:5,start:"20:00",end:"21:30"};$("#courtCount").value=eventSettings.courts;$("#startTime").value=eventSettings.start;$("#endTime").value=eventSettings.end;selectedIds=eventSettings.selectedIds||[];reserveIds=eventSettings.reserveIds||[];schedule=eventSettings.schedule||[];renderDashboard();renderOrganizerResponses();renderSelection();renderSchedule();renderLogbook()}
+function counts(){const yes=players.filter(p=>responses[p.id]==='yes').length,no=players.filter(p=>responses[p.id]==='no').length,blank=players.length-yes-no,max=Number(eventSettings.courts||5)*4;return{yes,no,blank,max,spots:Math.max(0,max-yes),overflow:Math.max(0,yes-max)}}
+function renderDashboard(){const c=counts();$("#dashboard").innerHTML=`<div class="metric"><span>Aangemeld</span><strong>${c.yes}</strong></div><div class="metric"><span>Capaciteit</span><strong>${c.max}</strong></div><div class="metric"><span>Nog plek</span><strong>${c.spots}</strong></div><div class="metric"><span>Reserve nodig</span><strong>${c.overflow}</strong></div><div class="metric"><span>Niet gereageerd</span><strong>${c.blank}</strong></div>`}
+function renderOrganizerResponses(){$("#organizerResponses").innerHTML=players.map(p=>{const s=responses[p.id]||'';return `<div class="response-row"><span><strong>${p.number}. ${esc(displayName(p))}</strong>${p.rating?` · ${p.rating}`:''}</span><div class="response-controls"><button class="yes ${s==='yes'?'active':''}" data-pid="${p.id}" data-status="yes">Ja</button><button class="no ${s==='no'?'active':''}" data-pid="${p.id}" data-status="no">Nee</button><button class="blank ${!s?'active':''}" data-pid="${p.id}" data-status="">Leeg</button></div></div>`}).join('');$("#organizerResponses").querySelectorAll('[data-status]').forEach(b=>b.onclick=async()=>{await setResponse(activeDate,b.dataset.pid,b.dataset.status,'organisator');responses=await getResponses(activeDate);renderDashboard();renderOrganizerResponses();renderParticipantWeeks()})}
+$("#saveEventSettings").onclick=async()=>{eventSettings.courts=Number($("#courtCount").value)||5;eventSettings.start=$("#startTime").value;eventSettings.end=$("#endTime").value;await setDoc(doc(db,"playingDates",activeDate),eventSettings,{merge:true});log('Speelavond gewijzigd',`${activeDate}: ${eventSettings.courts} banen, ${eventSettings.start}-${eventSettings.end}`);renderDashboard();toast('Instellingen opgeslagen')};
 
-onSnapshot(collection(db, "players"), snapshot => {
-  players = snapshot.docs.map(d => ({id:d.id, ...d.data()}))
-    .sort((a,b) => fullName(a).localeCompare(fullName(b), "nl"));
+async function statsMap(){const snap=await getDocs(collection(db,"stats"));const m={};snap.forEach(d=>m[d.id]=d.data());return m}
+async function createProposal(randomize=false){const available=players.filter(p=>responses[p.id]==='yes'),max=Number($("#courtCount").value||5)*4,target=Math.floor(Math.min(available.length,max)/4)*4,sm=await statsMap();let ordered=[...available].sort((a,b)=>((sm[a.id]?.reserveCount||0)-(sm[b.id]?.reserveCount||0))*-1||((sm[a.id]?.playedCount||0)-(sm[b.id]?.playedCount||0))||a.number-b.number);if(randomize)ordered=ordered.sort((a,b)=>Math.random()-.5);selectedIds=ordered.slice(0,target).map(p=>p.id);reserveIds=ordered.slice(target).map(p=>p.id);schedule=[];await persistSelection();renderSelection();renderSchedule();toast('Voorstel gemaakt')}
+async function persistSelection(){eventSettings={...eventSettings,courts:Number($("#courtCount").value||5),start:$("#startTime").value,end:$("#endTime").value,selectedIds,reserveIds,schedule};await setDoc(doc(db,"playingDates",activeDate),eventSettings,{merge:true})}
+$("#createProposal").onclick=()=>createProposal(false);$("#recalculateProposal").onclick=()=>createProposal(true);
+function renderSelection(){const selected=selectedIds.map(playerById).filter(Boolean),reserves=reserveIds.map(playerById).filter(Boolean);$("#selectionEditor").innerHTML=`<div class="selection-box"><h3>Speelt (${selected.length})</h3>${selected.map(p=>`<div class="selection-row"><span>${esc(displayName(p))}</span><button data-move="reserve" data-id="${p.id}" class="secondary">Naar reserve</button></div>`).join('')||'<p class="muted">Nog geen voorstel.</p>'}</div><div class="selection-box"><h3>Reserve (${reserves.length})</h3>${reserves.map(p=>`<div class="selection-row"><span>${esc(displayName(p))}</span><button data-move="play" data-id="${p.id}">Laat spelen</button></div>`).join('')||'<p class="muted">Geen reserves.</p>'}</div>`;$("#selectionEditor").querySelectorAll('[data-move]').forEach(b=>b.onclick=async()=>{const id=b.dataset.id;if(b.dataset.move==='reserve'){selectedIds=selectedIds.filter(x=>x!==id);reserveIds.push(id)}else{const max=Math.floor(Math.min(players.filter(p=>responses[p.id]==='yes').length,Number($("#courtCount").value)*4)/4)*4;if(selectedIds.length>=max){toast('Zet eerst iemand anders op reserve');return}reserveIds=reserveIds.filter(x=>x!==id);selectedIds.push(id)}schedule=[];await persistSelection();renderSelection();renderSchedule()})}
 
-  renderPlayerSelect();
-  renderPlayerList();
-  loadOverview();
-});
+function scoreCourt(arr){const r=arr.map(rating);let score=Math.abs((r[0]+r[3])-(r[1]+r[2]));const women=arr.filter(p=>p.gender==='Vrouw').length;if(women===2){const teams=[[arr[0],arr[3]],[arr[1],arr[2]]];if(!teams.every(t=>t.some(p=>p.gender==='Vrouw')&&t.some(p=>p.gender==='Man')))score+=5}return score}
+function bestGroups(list,courts){const sorted=[...list].sort((a,b)=>rating(a)-rating(b));const groups=Array.from({length:courts},()=>[]);sorted.forEach((p,i)=>groups[i%courts].push(p));return groups.map(g=>{if(g.length<4)return g;let best=g,bestScore=Infinity;const perms=permutations(g);for(const p of perms){const s=scoreCourt(p);if(s<bestScore){best=p;bestScore=s}}return best})}
+function permutations(a){if(a.length<=1)return[a];return a.flatMap((x,i)=>permutations(a.filter((_,j)=>j!==i)).map(p=>[x,...p]))}
+function generateAuto(){const list=selectedIds.map(playerById).filter(Boolean);if(list.length<4||list.length%4){toast('Het deelnemersveld moet een veelvoud van 4 zijn');return}schedule=bestGroups(list,list.length/4).map((g,i)=>({court:i+1,players:g.map(p=>p.id)}));persistSelection();renderSchedule()}
+$("#generateSchedule").onclick=generateAuto;$("#blankSchedule").onclick=()=>{const n=Math.floor(selectedIds.length/4);schedule=Array.from({length:n},(_,i)=>({court:i+1,players:['','','','']}));renderSchedule()};
+function options(current){return '<option value="">Kies speler</option>'+selectedIds.map(id=>{const p=playerById(id);return `<option value="${id}" ${id===current?'selected':''}>${esc(displayName(p))}</option>`}).join('')}
+function matchText(ids){const p=ids.map(playerById);if(p.some(x=>!x))return 'Kies vier spelers.';return `<strong>Tiebreak 1:</strong> ${esc(displayName(p[0]))} & ${esc(displayName(p[3]))} tegen ${esc(displayName(p[1]))} & ${esc(displayName(p[2]))}<br><strong>Tiebreak 2:</strong> ${esc(displayName(p[0]))} & ${esc(displayName(p[2]))} tegen ${esc(displayName(p[1]))} & ${esc(displayName(p[3]))}`}
+function renderSchedule(){$("#scheduleEditor").innerHTML=schedule.map((c,ci)=>`<div class="court"><h3>Baan ${ci+1}</h3><div class="court-grid">${c.players.map((id,pi)=>`<select data-court="${ci}" data-pos="${pi}">${options(id)}</select>`).join('')}</div><div class="match-preview">${matchText(c.players)}</div></div>`).join('')||'<p class="muted">Nog geen indeling.</p>';$("#scheduleEditor").querySelectorAll('select').forEach(s=>s.onchange=()=>{schedule[Number(s.dataset.court)].players[Number(s.dataset.pos)]=s.value;renderSchedule()})}
+function validateSchedule(){const ids=schedule.flatMap(c=>c.players);if(!schedule.length||ids.some(x=>!x))return 'Niet alle plekken zijn ingevuld.';if(new Set(ids).size!==ids.length)return 'Een speler staat meer dan één keer ingedeeld.';if(ids.length!==selectedIds.length)return 'Niet alle spelende deelnemers staan in de indeling.';return ''}
+$("#saveSchedule").onclick=async()=>{const err=validateSchedule();if(err){toast(err);return}await persistSelection();const batch=writeBatch(db);for(const id of selectedIds){const old=await getDoc(doc(db,'stats',id));const d=old.exists()?old.data():{};batch.set(doc(db,'stats',id),{playedCount:(d.playedCount||0)+1,lastPlayed:activeDate},{merge:true})}for(const id of reserveIds){const old=await getDoc(doc(db,'stats',id));const d=old.exists()?old.data():{};batch.set(doc(db,'stats',id),{reserveCount:(d.reserveCount||0)+1,lastReserve:activeDate},{merge:true})}await batch.commit();log('Definitieve indeling opgeslagen',activeDate);toast('Definitieve indeling opgeslagen')};
 
-function renderPlayerSelect(){
-  const current = playerSelect.value;
-  playerSelect.innerHTML = '<option value="">Kies je naam</option>';
+function wa(text){window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank')}
+function baseHeader(title){return `🎾 *Tiebreak-opstelling*\n${title}\n📅 ${formatDate(activeDate)}\n🕗 ${$("#startTime").value}–${$("#endTime").value}\n`}
+$("#waInvite").onclick=()=>wa(baseHeader('*Uitnodiging*')+`\nWie doet er mee? Geef je beschikbaarheid door via:\n${SITE_URL}`);
+$("#waSpots").onclick=()=>{const c=counts();wa(baseHeader('*Nog spelers gezocht!*')+`\nEr ${c.spots===1?'is':'zijn'} nog *${c.spots} ${c.spots===1?'plek':'plekken'}* beschikbaar.\nMeld je aan via ${SITE_URL}`)};
+$("#waUrgent").onclick=()=>{const n=prompt('Hoeveel invallers zijn dringend nodig?','1');if(!n)return;wa(baseHeader('🚨 *Dringend invaller gezocht!*')+`\nEr ${Number(n)===1?'is':'zijn'} op het laatste moment *${n} ${Number(n)===1?'plek':'plekken'}* vrijgekomen. Wie kan meedoen?`)};
+$("#waReminder").onclick=()=>{const names=players.filter(p=>!responses[p.id]).map(displayName);wa(baseHeader('🔔 *Herinnering*')+`\nNog niet gereageerd:\n${names.map(n=>'• '+n).join('\n')||'Iedereen heeft gereageerd.'}\n\nGeef je keuze door via ${SITE_URL}`)};
+$("#waSchedule").onclick=()=>{const err=validateSchedule();if(err){toast(err);return}let t=baseHeader('*Definitieve indeling*')+'\n';schedule.forEach((c,i)=>{const p=c.players.map(playerById);t+=`*Baan ${i+1}*\nTiebreak 1: ${displayName(p[0])} & ${displayName(p[3])} tegen ${displayName(p[1])} & ${displayName(p[2])}\nTiebreak 2: ${displayName(p[0])} & ${displayName(p[2])} tegen ${displayName(p[1])} & ${displayName(p[3])}\n\n`});if(reserveIds.length)t+=`*Reserve:* ${reserveIds.map(id=>displayName(playerById(id))).join(', ')}\n`;wa(t+'Veel plezier! 🎾')};
 
-  players.forEach(p => {
-    const option = document.createElement("option");
-    option.value = p.id;
-    option.textContent = `${fullName(p)} · rating ${p.rating ?? "-"}`;
-    playerSelect.appendChild(option);
-  });
+function nextNumber(){return Math.max(0,...players.map(p=>Number(p.number)||0))+1}
+$("#playerForm").onsubmit=async e=>{e.preventDefault();const id=$("#editPlayerId").value,data={firstName:$("#firstName").value.trim(),lastName:$("#lastName").value.trim(),gender:$("#gender").value,rating:$("#rating").value?Number($("#rating").value):null};if(!data.firstName)return;if(id){await updateDoc(doc(db,'players',id),data);log('Speler gewijzigd',fullName(data))}else{data.number=nextNumber();data.createdAt=new Date().toISOString();await addDoc(collection(db,'players'),data);log('Speler toegevoegd',fullName(data))}resetPlayerForm();toast('Speler opgeslagen')};
+function resetPlayerForm(){$("#playerForm").reset();$("#editPlayerId").value='';$("#cancelEdit").classList.add('hidden')}
+$("#cancelEdit").onclick=resetPlayerForm;
+function renderPlayers(){$("#playerList").innerHTML='<h3>Huidige spelers</h3>'+players.map(p=>`<div class="player-row"><span><strong>${p.number}. ${esc(fullName(p))}</strong><br><span class="muted">${esc(p.gender||'Geslacht leeg')} · rating ${p.rating??'leeg'}</span></span><div class="player-row-actions"><button data-edit="${p.id}">Wijzigen</button><button data-delete="${p.id}" class="danger">Verwijderen</button></div></div>`).join('');$("#playerList").querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{const p=playerById(b.dataset.edit);$("#editPlayerId").value=p.id;$("#firstName").value=p.firstName||'';$("#lastName").value=p.lastName||'';$("#gender").value=p.gender||'';$("#rating").value=p.rating??'';$("#cancelEdit").classList.remove('hidden');scrollTo({top:0,behavior:'smooth'})});$("#playerList").querySelectorAll('[data-delete]').forEach(b=>b.onclick=async()=>{const p=playerById(b.dataset.delete);if(confirm(`Verwijder ${fullName(p)}?`)){await deleteDoc(doc(db,'players',p.id));log('Speler verwijderd',fullName(p))}})}
 
-  if(players.some(p => p.id === current)) playerSelect.value = current;
-}
+function parseText(text){return text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).map(line=>{if(line.includes(';')){const [firstName='',lastName='',gender='',rating='']=line.split(';').map(x=>x.trim());return{firstName,lastName,gender:/^vrouw$/i.test(gender)?'Vrouw':/^man$/i.test(gender)?'Man':'',rating:rating?Number(String(rating).replace(',','.')):null}}const parts=line.split(/\s+/);return{firstName:parts.shift()||'',lastName:parts.join(' '),gender:'',rating:null}})}
+function normalizeSheetRow(r){const get=(...names)=>{const k=Object.keys(r).find(x=>names.includes(x.toLowerCase().trim()));return k?r[k]:''};return{firstName:String(get('voornaam','firstname','first name')||'').trim(),lastName:String(get('achternaam','lastname','last name')||'').trim(),gender:/vrouw/i.test(get('geslacht','gender'))?'Vrouw':/man/i.test(get('geslacht','gender'))?'Man':'',rating:(()=>{const n=Number(String(get('rating','dubbelrating','knltb dubbelrating')||'').replace(',','.'));return Number.isFinite(n)?n:null})()}}
+$("#previewImport").onclick=async()=>{const f=$("#bulkFile").files[0];if(f){const data=await f.arrayBuffer(),wb=XLSX.read(data),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});importRows=rows.map(normalizeSheetRow).filter(x=>x.firstName)}else importRows=parseText($("#bulkText").value);renderImportPreview()};
+function renderImportPreview(){$("#importPreview").innerHTML=importRows.length?`<table><thead><tr><th>Nr.</th><th>Voornaam</th><th>Achternaam</th><th>Geslacht</th><th>Rating</th></tr></thead><tbody>${importRows.map((r,i)=>`<tr><td>${nextNumber()+i}</td><td>${esc(r.firstName)}</td><td>${esc(r.lastName)}</td><td>${esc(r.gender)}</td><td>${r.rating??''}</td></tr>`).join('')}</tbody></table>`:'<p class="preview-warning">Geen geldige regels gevonden.</p>';$("#confirmImport").classList.toggle('hidden',!importRows.length)}
+$("#confirmImport").onclick=async()=>{const batch=writeBatch(db);let n=nextNumber();importRows.forEach(r=>batch.set(doc(collection(db,'players')),{...r,number:n++,createdAt:new Date().toISOString()}));await batch.commit();log('Bulkimport',`${importRows.length} spelers`);importRows=[];renderImportPreview();toast('Spelers geïmporteerd')};
+$("#clearImport").onclick=()=>{$("#bulkText").value='';$("#bulkFile").value='';importRows=[];renderImportPreview()};
 
-function renderPlayerList(){
-  const container = document.getElementById("playerList");
-
-  if(!players.length){
-    container.innerHTML = '<div class="notice warning">Er zijn nog geen spelers toegevoegd.</div>';
-    return;
-  }
-
-  container.innerHTML = players.map(p => `
-    <div class="player-card">
-      <strong>${escapeHtml(fullName(p))}</strong><br>
-      Geslacht: ${escapeHtml(p.gender || "-")}<br>
-      KNLTB-dubbelrating: ${escapeHtml(String(p.rating ?? "-"))}<br>
-      <button class="danger" onclick="removePlayer('${p.id}', '${escapeQuotes(fullName(p))}')">Verwijderen</button>
-    </div>
-  `).join("");
-}
-
-window.addPlayer = async function(){
-  const firstName = document.getElementById("firstName").value.trim();
-  const lastName = document.getElementById("lastName").value.trim();
-  const gender = document.getElementById("gender").value;
-  const ratingRaw = document.getElementById("rating").value;
-  const message = document.getElementById("managementMessage");
-
-  if(!firstName || !lastName || !gender || !ratingRaw){
-    message.className = "notice warning";
-    message.textContent = "Vul alle velden in.";
-    return;
-  }
-
-  const rating = Number(ratingRaw);
-  if(Number.isNaN(rating) || rating < 1 || rating > 9){
-    message.className = "notice warning";
-    message.textContent = "De rating moet tussen 1 en 9 liggen.";
-    return;
-  }
-
-  try{
-    await addDoc(collection(db, "players"), {
-      firstName, lastName, gender, rating,
-      createdAt: new Date().toISOString()
-    });
-
-    document.getElementById("firstName").value = "";
-    document.getElementById("lastName").value = "";
-    document.getElementById("gender").value = "";
-    document.getElementById("rating").value = "";
-
-    message.className = "notice success";
-    message.textContent = `${firstName} ${lastName} is toegevoegd.`;
-  }catch(err){
-    message.className = "notice error";
-    message.textContent = "Toevoegen mislukt: " + err.message;
-  }
-};
-
-window.removePlayer = async function(id, name){
-  if(!confirm(`Weet je zeker dat je ${name} wilt verwijderen?`)) return;
-
-  try{
-    await deleteDoc(doc(db, "players", id));
-    const message = document.getElementById("managementMessage");
-    message.className = "notice success";
-    message.textContent = `${name} is verwijderd.`;
-  }catch(err){
-    const message = document.getElementById("managementMessage");
-    message.className = "notice error";
-    message.textContent = "Verwijderen mislukt: " + err.message;
-  }
-};
-
-window.saveAvailability = async function(status){
-  const playerId = playerSelect.value;
-  const date = playDate.value;
-  const message = document.getElementById("playerMessage");
-
-  if(!playerId){
-    message.className = "notice warning";
-    message.textContent = "Kies eerst je naam.";
-    return;
-  }
-
-  const player = players.find(p => p.id === playerId);
-
-  try{
-    await setDoc(doc(db, "playingDates", date, "responses", playerId), {
-      playerId,
-      status,
-      updatedAt: new Date().toISOString()
-    });
-
-    message.className = "notice success";
-    message.textContent = `${fullName(player)} staat voor ${date} op ${status === "yes" ? "JA" : "NEE"}.`;
-  }catch(err){
-    message.className = "notice error";
-    message.textContent = "Opslaan mislukt: " + err.message;
-  }
-};
-
-organizerDate.addEventListener("change", loadOverview);
-
-window.loadOverview = async function(){
-  const date = organizerDate.value;
-  const overview = document.getElementById("overview");
-
-  if(!date){
-    overview.textContent = "Kies eerst een datum.";
-    return;
-  }
-
-  try{
-    const snap = await getDocs(collection(db, "playingDates", date, "responses"));
-    const responses = {};
-    snap.forEach(d => responses[d.id] = d.data().status);
-
-    let html = `
-      <table>
-        <thead>
-          <tr>
-            <th>Speler</th>
-            <th>Geslacht</th>
-            <th>Rating</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
-
-    players.forEach(p => {
-      const status = responses[p.id];
-      let label = "Nog niet ingevuld";
-      if(status === "yes") label = "✅ Doet mee";
-      if(status === "no") label = "❌ Kan niet";
-
-      html += `
-        <tr>
-          <td>${escapeHtml(fullName(p))}</td>
-          <td>${escapeHtml(p.gender || "-")}</td>
-          <td>${escapeHtml(String(p.rating ?? "-"))}</td>
-          <td>${label}</td>
-        </tr>
-      `;
-    });
-
-    html += "</tbody></table>";
-    overview.innerHTML = html;
-  }catch(err){
-    overview.innerHTML = `<div class="notice error">Laden mislukt: ${escapeHtml(err.message)}</div>`;
-  }
-};
-
-window.makeSchedule = async function(){
-  const date = organizerDate.value;
-  const result = document.getElementById("scheduleResult");
-  const matches = document.getElementById("matches");
-  matches.innerHTML = "";
-
-  try{
-    const snap = await getDocs(collection(db, "playingDates", date, "responses"));
-    const yesIds = [];
-    snap.forEach(d => {
-      if(d.data().status === "yes") yesIds.push(d.id);
-    });
-
-    const available = players.filter(p => yesIds.includes(p.id));
-
-    if(available.length < 4){
-      result.className = "notice warning";
-      result.textContent = `Er zijn ${available.length} spelers beschikbaar. Er zijn minimaal 4 nodig.`;
-      currentScheduleText = "";
-      return;
-    }
-
-    const fieldSize = Math.floor(available.length / 4) * 4;
-    const sorted = [...available].sort((a,b) => Number(a.rating) - Number(b.rating));
-    const selected = sorted.slice(0, fieldSize);
-    const reserves = sorted.slice(fieldSize);
-
-    result.className = "notice success";
-    result.innerHTML =
-      `<strong>Deelnemersveld:</strong> ${selected.map(p => escapeHtml(fullName(p))).join(", ")}` +
-      (reserves.length ? `<br><strong>Reserve:</strong> ${reserves.map(p => escapeHtml(fullName(p))).join(", ")}` : "");
-
-    const lines = [`🎾 Tennis dinsdag ${date} 20:00–21:30`];
-
-    for(let i=0;i<selected.length;i+=4){
-      const [a,b,c,d] = selected.slice(i,i+4);
-      const div = document.createElement("div");
-      div.className = "match";
-      div.innerHTML = `
-        <strong>Baan ${i/4+1}</strong><br>
-        Tiebreak 1: ${escapeHtml(fullName(a))} & ${escapeHtml(fullName(d))}
-        tegen ${escapeHtml(fullName(b))} & ${escapeHtml(fullName(c))}<br>
-        Tiebreak 2: ${escapeHtml(fullName(a))} & ${escapeHtml(fullName(c))}
-        tegen ${escapeHtml(fullName(b))} & ${escapeHtml(fullName(d))}
-      `;
-      matches.appendChild(div);
-
-      lines.push(
-        `Baan ${i/4+1}`,
-        `Tiebreak 1: ${fullName(a)} & ${fullName(d)} tegen ${fullName(b)} & ${fullName(c)}`,
-        `Tiebreak 2: ${fullName(a)} & ${fullName(c)} tegen ${fullName(b)} & ${fullName(d)}`
-      );
-    }
-
-    if(reserves.length){
-      lines.push(`Reserve: ${reserves.map(fullName).join(", ")}`);
-    }
-
-    currentScheduleText = lines.join("\\n");
-  }catch(err){
-    result.className = "notice error";
-    result.textContent = "Indeling maken mislukt: " + err.message;
-  }
-};
-
-window.shareWhatsApp = function(){
-  if(!currentScheduleText){
-    alert("Maak eerst een deelnemersveld.");
-    return;
-  }
-  window.open("https://wa.me/?text=" + encodeURIComponent(currentScheduleText), "_blank");
-};
-
-function escapeHtml(value){
-  return String(value)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
-function escapeQuotes(value){
-  return String(value).replaceAll("\\","\\\\").replaceAll("'","\\'");
-}
-
-loadOverview();
+async function renderStats(){if(!players.length){$("#statsTable").innerHTML='';return}const sm=await statsMap();$("#statsTable").innerHTML=`<table><thead><tr><th>Nr.</th><th>Speler</th><th>Gespeeld</th><th>Reserve</th><th>Laatste keer</th></tr></thead><tbody>${players.map(p=>{const s=sm[p.id]||{};return `<tr><td>${p.number}</td><td>${esc(fullName(p))}</td><td>${s.playedCount||0}</td><td>${s.reserveCount||0}</td><td>${s.lastPlayed||''}</td></tr>`}).join('')}</tbody></table>`}
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function exportRows(){return players.map(p=>({Nummer:p.number,Voornaam:p.firstName,Achternaam:p.lastName,Geslacht:p.gender,Rating:p.rating}))}
+$("#exportCsv").onclick=()=>{const ws=XLSX.utils.json_to_sheet(exportRows()),csv=XLSX.utils.sheet_to_csv(ws);download(new Blob([csv],{type:'text/csv;charset=utf-8'}),'tiebreak-spelers.csv')};
+$("#exportXlsx").onclick=()=>{const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(exportRows()),'Spelers');XLSX.writeFile(wb,'tiebreak-spelers.xlsx')};
+$("#exportBackup").onclick=async()=>{const events={};for(const d of dates){const e=await getDoc(doc(db,'playingDates',d));events[d]={settings:e.exists()?e.data():{},responses:await getResponses(d)}}const backup={version:1,createdAt:new Date().toISOString(),players:players.map(({id,...p})=>({id,...p})),events};download(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}),'tiebreak-backup.json')};
+$("#restoreBackup").onchange=async e=>{const backup=JSON.parse(await e.target.files[0].text());if(!confirm('Deze back-up toevoegen/herstellen?'))return;const batch=writeBatch(db);(backup.players||[]).forEach(p=>{const{id,...data}=p;batch.set(doc(db,'players',id),data)});for(const[d,v]of Object.entries(backup.events||{})){batch.set(doc(db,'playingDates',d),v.settings||{});for(const[pid,status]of Object.entries(v.responses||{}))batch.set(doc(db,'playingDates',d,'responses',pid),{playerId:pid,status})}await batch.commit();toast('Back-up hersteld')};
+async function renderLogbook(){const snap=await getDocs(query(collection(db,'logs'),orderBy('createdAt','desc'),limit(30)));$("#logbook").innerHTML=snap.docs.map(d=>{const x=d.data();return `<div class="player-row"><span><strong>${esc(x.action)}</strong><br>${esc(x.details||'')}</span><small>${new Date(x.createdAt).toLocaleString('nl-NL')}</small></div>`}).join('')||'<p class="muted">Nog geen logregels.</p>'}
