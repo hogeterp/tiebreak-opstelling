@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tiebreak-opstelling</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <h1>🎾 Tiebreak-opstelling</h1>
+  <p class="sub">Dinsdag 20:00–21:30 · twee tiebreaks</p>
+
+  <div class="tabs">
+    <button onclick="showTab('player')">Deelnemer</button>
+    <button class="secondary" onclick="showTab('organizer')">Organisator</button>
+    <button class="secondary" onclick="showTab('management')">Spelers beheren</button>
+  </div>
+
+  <section id="playerTab" class="card">
+    <h2>Beschikbaarheid doorgeven</h2>
+
+    <label for="playDate">Dinsdag</label>
+    <input id="playDate" type="date">
+
+    <label for="playerSelect">Speler</label>
+    <select id="playerSelect">
+      <option value="">Kies je naam</option>
+    </select>
+
+    <div class="row-actions">
+      <button class="green" onclick="saveAvailability('yes')">Ja, ik doe mee</button>
+      <button class="danger" onclick="saveAvailability('no')">Nee, ik kan niet</button>
+    </div>
+
+    <div id="playerMessage" class="notice">Kies je naam en geef je keuze door.</div>
+  </section>
+
+  <section id="organizerTab" class="card hidden">
+    <h2>Overzicht organisator</h2>
+
+    <label for="organizerDate">Dinsdag</label>
+    <input id="organizerDate" type="date">
+
+    <div id="overview" class="small">Overzicht wordt geladen...</div>
+
+    <div class="row-actions">
+      <button onclick="makeSchedule()">Maak deelnemersveld</button>
+      <button class="secondary" onclick="loadOverview()">Vernieuwen</button>
+      <button class="green" onclick="shareWhatsApp()">Deel via WhatsApp</button>
+    </div>
+
+    <div id="scheduleResult" class="notice">Nog geen indeling gemaakt.</div>
+    <div id="matches"></div>
+  </section>
+
+  <section id="managementTab" class="card hidden">
+    <h2>Spelers beheren</h2>
+    <p class="small">Voeg spelers toe met naam, geslacht en KNLTB-dubbelrating.</p>
+
+    <div class="grid">
+      <div>
+        <label for="firstName">Voornaam</label>
+        <input id="firstName" type="text" placeholder="Bijvoorbeeld Rinze">
+      </div>
+      <div>
+        <label for="lastName">Achternaam</label>
+        <input id="lastName" type="text" placeholder="Achternaam">
+      </div>
+      <div>
+        <label for="gender">Geslacht</label>
+        <select id="gender">
+          <option value="">Kies</option>
+          <option value="Man">Man</option>
+          <option value="Vrouw">Vrouw</option>
+          <option value="Anders">Anders / niet opgegeven</option>
+        </select>
+      </div>
+      <div>
+        <label for="rating">KNLTB-dubbelrating</label>
+        <input id="rating" type="number" min="1" max="9" step="0.1" placeholder="Bijvoorbeeld 7.3">
+      </div>
+    </div>
+
+    <button onclick="addPlayer()">Speler toevoegen</button>
+    <div id="managementMessage" class="notice">Nog geen wijziging uitgevoerd.</div>
+
+    <h3>Huidige spelers</h3>
+    <div id="playerList">Spelers worden geladen...</div>
+  </section>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
