@@ -2,140 +2,118 @@
 <html lang="nl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#166534">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b7a3e">
   <title>Tiebreak-opstelling</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-<header class="hero">
-  <div>
-    <h1>🎾 Tiebreak-opstelling</h1>
-    <p>Dinsdag 20:00–21:30 · standaard 5 banen</p>
-  </div>
-  <span id="connectionBadge" class="badge">Verbinden…</span>
+<header class="topbar">
+  <div><h1>🎾 Tiebreak-opstelling</h1><p>Dinsdag 20:00–21:30</p></div>
+  <button class="iconbtn" id="refreshBtn" title="Vernieuwen">↻</button>
 </header>
-
 <nav class="tabs" aria-label="Hoofdnavigatie">
   <button data-tab="participant" class="active">Deelnemer</button>
   <button data-tab="organizer">Organisator</button>
   <button data-tab="players">Spelers</button>
-  <button data-tab="statistics">Statistieken</button>
 </nav>
+<main>
+<section id="participant" class="panel active">
+  <div class="card compact">
+    <label>Wie ben je?</label>
+    <select id="participantSelect"><option value="">Kies je naam</option></select>
+    <p id="profileHint" class="hint"></p>
+  </div>
+  <div id="upcomingParticipant"></div>
+</section>
 
-<main class="app">
-  <section id="participant" class="panel tab-panel">
-    <h2>Mijn beschikbaarheid</h2>
-    <label>Wie ben je?
-      <select id="participantPlayer"><option value="">Kies je naam</option></select>
-    </label>
-    <div id="participantWeeks" class="week-grid"></div>
-  </section>
-
-  <section id="organizer" class="panel tab-panel hidden">
-    <div class="heading-row">
-      <div><h2>Organisator</h2><p class="muted">De organisator kan alle statussen, reserves en indelingen aanpassen.</p></div>
-      <label class="compact">Speelavond
-        <select id="organizerDate"></select>
-      </label>
+<section id="organizer" class="panel">
+  <div class="summary-grid" id="organizerSummary"></div>
+  <div class="card compact">
+    <div class="row between"><h2>Speelavond</h2><select id="orgDate"></select></div>
+    <div class="grid2">
+      <label>Aantal banen<input id="courtCount" type="number" min="1" max="10" value="5"></label>
+      <label>Max. spelers<input id="maxPlayers" type="text" readonly></label>
     </div>
-
-    <div id="dashboard" class="dashboard"></div>
-
-    <details open>
-      <summary>Instellingen speelavond</summary>
-      <div class="form-grid">
-        <label>Aantal banen<input id="courtCount" type="number" min="1" max="20" value="5"></label>
-        <label>Begintijd<input id="startTime" type="time" value="20:00"></label>
-        <label>Eindtijd<input id="endTime" type="time" value="21:30"></label>
-      </div>
-      <button id="saveEventSettings">Instellingen opslaan</button>
-    </details>
-
-    <details open>
-      <summary>Beschikbaarheid beheren</summary>
-      <div id="organizerResponses"></div>
-    </details>
-
-    <details open>
-      <summary>Deelnemersveld en reserves</summary>
-      <div class="button-row">
-        <button id="createProposal">Maak voorstel</button>
-        <button id="recalculateProposal" class="secondary">Nieuw voorstel</button>
-      </div>
-      <div id="selectionEditor" class="selection-editor"></div>
-    </details>
-
-    <details open>
-      <summary>Indeling</summary>
-      <div class="button-row">
-        <button id="generateSchedule">Automatische indeling</button>
-        <button id="blankSchedule" class="secondary">Volledig handmatig</button>
-        <button id="saveSchedule" class="success">Definitief opslaan</button>
-      </div>
-      <div id="scheduleEditor"></div>
-    </details>
-
-    <details>
-      <summary>WhatsApp-berichten</summary>
-      <div class="button-grid">
-        <button id="waInvite">📢 Uitnodiging</button>
-        <button id="waSpots">🎾 Nog spelers gezocht</button>
-        <button id="waUrgent" class="danger">🚨 Dringend invaller</button>
-        <button id="waSchedule" class="success">✅ Definitieve indeling</button>
-        <button id="waReminder" class="secondary">🔔 Herinnering niet gereageerd</button>
-      </div>
-    </details>
-
-    <details>
-      <summary>Logboek</summary>
-      <div id="logbook"></div>
-    </details>
-  </section>
-
-  <section id="players" class="panel tab-panel hidden">
-    <h2>Spelers beheren</h2>
-    <form id="playerForm">
-      <input id="editPlayerId" type="hidden">
-      <div class="form-grid">
-        <label>Voornaam*<input id="firstName" required></label>
-        <label>Achternaam<input id="lastName"></label>
-        <label>Geslacht
-          <select id="gender"><option value=""></option><option>Man</option><option>Vrouw</option></select>
-        </label>
-        <label>KNLTB-dubbelrating<input id="rating" type="number" min="1" max="9" step="0.0001"></label>
-      </div>
-      <div class="button-row"><button type="submit">Opslaan</button><button type="button" id="cancelEdit" class="secondary hidden">Annuleren</button></div>
-    </form>
-
-    <details>
-      <summary>Bulkimport: tekst, CSV of Excel</summary>
-      <p class="muted">Tekst: één naam per regel, of <code>Voornaam;Achternaam;Geslacht;Rating</code>.</p>
-      <textarea id="bulkText" rows="9" placeholder="Carel;Jacobs;Man;6.1234&#10;Martine;;Vrouw;"></textarea>
-      <label class="file-label">CSV of Excel selecteren<input id="bulkFile" type="file" accept=".csv,.xlsx,.xls"></label>
-      <div class="button-row"><button id="previewImport" type="button">Voorbeeld bekijken</button><button id="clearImport" type="button" class="secondary">Wissen</button></div>
-      <div id="importPreview"></div>
-      <button id="confirmImport" type="button" class="success hidden">Alles importeren</button>
-    </details>
-
-    <div id="playerList"></div>
-  </section>
-
-  <section id="statistics" class="panel tab-panel hidden">
-    <h2>Statistieken en back-up</h2>
-    <p class="muted">Er worden geen uitslagen of punten bijgehouden.</p>
-    <div class="button-row">
-      <button id="exportCsv">Export CSV</button>
-      <button id="exportXlsx">Export Excel</button>
-      <button id="exportBackup">Volledige back-up</button>
-      <label class="button file-button">Back-up herstellen<input id="restoreBackup" type="file" accept=".json"></label>
+    <button id="saveEveningBtn">Instellingen opslaan</button>
+  </div>
+  <div class="card compact">
+    <h2>Aanmeldingen</h2>
+    <div id="organizerResponses"></div>
+  </div>
+  <div class="card compact">
+    <div class="row between"><h2>Deelnemersveld</h2><button id="proposeFieldBtn">Voorstel</button></div>
+    <div class="two-columns">
+      <div><h3>Speelt</h3><div id="playingList" class="move-list"></div></div>
+      <div><h3>Reserve</h3><div id="reserveList" class="move-list"></div></div>
     </div>
-    <div id="statsTable"></div>
-  </section>
+    <div class="row wrap">
+      <button id="generateScheduleBtn">Automatische indeling</button>
+      <button id="manualScheduleBtn" class="secondary">Handmatig maken</button>
+    </div>
+    <div id="scheduleOutput"></div>
+  </div>
+  <div class="card compact">
+    <h2>WhatsApp</h2>
+    <div class="button-grid">
+      <button data-wa="invite">Uitnodiging</button>
+      <button data-wa="spots">Nog spelers gezocht</button>
+      <button data-wa="urgent" class="danger">Dringend invaller</button>
+      <button data-wa="reminder">Herinnering</button>
+      <button data-wa="details">Gegevens aanvullen</button>
+      <button data-wa="schedule">Definitieve indeling</button>
+    </div>
+  </div>
+  <details class="card compact">
+    <summary><strong>Statistieken</strong></summary>
+    <div id="statistics"></div>
+    <div class="row wrap">
+      <button id="exportCsvBtn" class="secondary">CSV export</button>
+      <button id="exportXlsxBtn" class="secondary">Excel export</button>
+      <button id="backupBtn" class="secondary">Back-up</button>
+    </div>
+  </details>
+  <details class="card compact">
+    <summary><strong>Logboek</strong></summary>
+    <div id="logbook"></div>
+  </details>
+</section>
+
+<section id="players" class="panel">
+  <div class="card compact">
+    <h2>Speler toevoegen of wijzigen</h2>
+    <input type="hidden" id="editPlayerId">
+    <div class="grid2">
+      <label>Voornaam<input id="firstName"></label>
+      <label>Achternaam<input id="lastName"></label>
+      <label>Geslacht<select id="gender"><option value=""></option><option>Man</option><option>Vrouw</option></select></label>
+      <label>KNLTB-dubbelrating<input id="rating" type="number" min="1" max="9" step="0.1"></label>
+    </div>
+    <div class="row wrap"><button id="savePlayerBtn">Opslaan</button><button id="cancelEditBtn" class="secondary hidden">Annuleren</button></div>
+  </div>
+  <div class="card compact">
+    <h2>Bulkimport</h2>
+    <p class="hint">Tekst: één speler per regel. Of: Voornaam;Achternaam;Geslacht;Rating</p>
+    <textarea id="bulkText" rows="6" placeholder="Carel;Jacobs;Man;6.4"></textarea>
+    <label class="filelabel">CSV/Excel kiezen<input id="importFile" type="file" accept=".csv,.xlsx,.xls"></label>
+    <div class="row wrap"><button id="previewImportBtn">Voorbeeld</button><button id="confirmImportBtn" class="secondary" disabled>Importeren</button></div>
+    <div id="importPreview"></div>
+  </div>
+  <div class="card compact">
+    <h2>Spelerslijst</h2>
+    <div id="playersList"></div>
+  </div>
+</section>
 </main>
 
-<div id="toast" role="status"></div>
+<div id="waModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modalbox">
+    <div class="row between"><h2>WhatsApp-voorbeeld</h2><button id="closeWaBtn" class="iconbtn">✕</button></div>
+    <textarea id="waPreview" rows="14"></textarea>
+    <div class="row wrap"><button id="openWaBtn">Open WhatsApp</button><button id="copyWaBtn" class="secondary">Kopieer tekst</button></div>
+  </div>
+</div>
 <script type="module" src="app.js"></script>
 </body>
 </html>
