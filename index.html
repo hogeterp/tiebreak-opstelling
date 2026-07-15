@@ -3,93 +3,139 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#166534">
   <title>Tiebreak-opstelling</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-<div class="app">
-  <h1>🎾 Tiebreak-opstelling</h1>
-  <p class="sub">Dinsdag 20:00–21:30 · twee tiebreaks</p>
-
-  <div class="tabs">
-    <button onclick="showTab('player')">Deelnemer</button>
-    <button class="secondary" onclick="showTab('organizer')">Organisator</button>
-    <button class="secondary" onclick="showTab('management')">Spelers beheren</button>
+<header class="hero">
+  <div>
+    <h1>🎾 Tiebreak-opstelling</h1>
+    <p>Dinsdag 20:00–21:30 · standaard 5 banen</p>
   </div>
+  <span id="connectionBadge" class="badge">Verbinden…</span>
+</header>
 
-  <section id="playerTab" class="card">
-    <h2>Beschikbaarheid doorgeven</h2>
+<nav class="tabs" aria-label="Hoofdnavigatie">
+  <button data-tab="participant" class="active">Deelnemer</button>
+  <button data-tab="organizer">Organisator</button>
+  <button data-tab="players">Spelers</button>
+  <button data-tab="statistics">Statistieken</button>
+</nav>
 
-    <label for="playDate">Dinsdag</label>
-    <input id="playDate" type="date">
-
-    <label for="playerSelect">Speler</label>
-    <select id="playerSelect">
-      <option value="">Kies je naam</option>
-    </select>
-
-    <div class="row-actions">
-      <button class="green" onclick="saveAvailability('yes')">Ja, ik doe mee</button>
-      <button class="danger" onclick="saveAvailability('no')">Nee, ik kan niet</button>
-    </div>
-
-    <div id="playerMessage" class="notice">Kies je naam en geef je keuze door.</div>
+<main class="app">
+  <section id="participant" class="panel tab-panel">
+    <h2>Mijn beschikbaarheid</h2>
+    <label>Wie ben je?
+      <select id="participantPlayer"><option value="">Kies je naam</option></select>
+    </label>
+    <div id="participantWeeks" class="week-grid"></div>
   </section>
 
-  <section id="organizerTab" class="card hidden">
-    <h2>Overzicht organisator</h2>
-
-    <label for="organizerDate">Dinsdag</label>
-    <input id="organizerDate" type="date">
-
-    <div id="overview" class="small">Overzicht wordt geladen...</div>
-
-    <div class="row-actions">
-      <button onclick="makeSchedule()">Maak deelnemersveld</button>
-      <button class="secondary" onclick="loadOverview()">Vernieuwen</button>
-      <button class="green" onclick="shareWhatsApp()">Deel via WhatsApp</button>
+  <section id="organizer" class="panel tab-panel hidden">
+    <div class="heading-row">
+      <div><h2>Organisator</h2><p class="muted">De organisator kan alle statussen, reserves en indelingen aanpassen.</p></div>
+      <label class="compact">Speelavond
+        <select id="organizerDate"></select>
+      </label>
     </div>
 
-    <div id="scheduleResult" class="notice">Nog geen indeling gemaakt.</div>
-    <div id="matches"></div>
+    <div id="dashboard" class="dashboard"></div>
+
+    <details open>
+      <summary>Instellingen speelavond</summary>
+      <div class="form-grid">
+        <label>Aantal banen<input id="courtCount" type="number" min="1" max="20" value="5"></label>
+        <label>Begintijd<input id="startTime" type="time" value="20:00"></label>
+        <label>Eindtijd<input id="endTime" type="time" value="21:30"></label>
+      </div>
+      <button id="saveEventSettings">Instellingen opslaan</button>
+    </details>
+
+    <details open>
+      <summary>Beschikbaarheid beheren</summary>
+      <div id="organizerResponses"></div>
+    </details>
+
+    <details open>
+      <summary>Deelnemersveld en reserves</summary>
+      <div class="button-row">
+        <button id="createProposal">Maak voorstel</button>
+        <button id="recalculateProposal" class="secondary">Nieuw voorstel</button>
+      </div>
+      <div id="selectionEditor" class="selection-editor"></div>
+    </details>
+
+    <details open>
+      <summary>Indeling</summary>
+      <div class="button-row">
+        <button id="generateSchedule">Automatische indeling</button>
+        <button id="blankSchedule" class="secondary">Volledig handmatig</button>
+        <button id="saveSchedule" class="success">Definitief opslaan</button>
+      </div>
+      <div id="scheduleEditor"></div>
+    </details>
+
+    <details>
+      <summary>WhatsApp-berichten</summary>
+      <div class="button-grid">
+        <button id="waInvite">📢 Uitnodiging</button>
+        <button id="waSpots">🎾 Nog spelers gezocht</button>
+        <button id="waUrgent" class="danger">🚨 Dringend invaller</button>
+        <button id="waSchedule" class="success">✅ Definitieve indeling</button>
+        <button id="waReminder" class="secondary">🔔 Herinnering niet gereageerd</button>
+      </div>
+    </details>
+
+    <details>
+      <summary>Logboek</summary>
+      <div id="logbook"></div>
+    </details>
   </section>
 
-  <section id="managementTab" class="card hidden">
+  <section id="players" class="panel tab-panel hidden">
     <h2>Spelers beheren</h2>
-    <p class="small">Voeg spelers toe met naam, geslacht en KNLTB-dubbelrating.</p>
+    <form id="playerForm">
+      <input id="editPlayerId" type="hidden">
+      <div class="form-grid">
+        <label>Voornaam*<input id="firstName" required></label>
+        <label>Achternaam<input id="lastName"></label>
+        <label>Geslacht
+          <select id="gender"><option value=""></option><option>Man</option><option>Vrouw</option></select>
+        </label>
+        <label>KNLTB-dubbelrating<input id="rating" type="number" min="1" max="9" step="0.0001"></label>
+      </div>
+      <div class="button-row"><button type="submit">Opslaan</button><button type="button" id="cancelEdit" class="secondary hidden">Annuleren</button></div>
+    </form>
 
-    <div class="grid">
-      <div>
-        <label for="firstName">Voornaam</label>
-        <input id="firstName" type="text" placeholder="Bijvoorbeeld Rinze">
-      </div>
-      <div>
-        <label for="lastName">Achternaam</label>
-        <input id="lastName" type="text" placeholder="Achternaam">
-      </div>
-      <div>
-        <label for="gender">Geslacht</label>
-        <select id="gender">
-          <option value="">Kies</option>
-          <option value="Man">Man</option>
-          <option value="Vrouw">Vrouw</option>
-          <option value="Anders">Anders / niet opgegeven</option>
-        </select>
-      </div>
-      <div>
-        <label for="rating">KNLTB-dubbelrating</label>
-        <input id="rating" type="number" min="1" max="9" step="0.1" placeholder="Bijvoorbeeld 7.3">
-      </div>
-    </div>
+    <details>
+      <summary>Bulkimport: tekst, CSV of Excel</summary>
+      <p class="muted">Tekst: één naam per regel, of <code>Voornaam;Achternaam;Geslacht;Rating</code>.</p>
+      <textarea id="bulkText" rows="9" placeholder="Carel;Jacobs;Man;6.1234&#10;Martine;;Vrouw;"></textarea>
+      <label class="file-label">CSV of Excel selecteren<input id="bulkFile" type="file" accept=".csv,.xlsx,.xls"></label>
+      <div class="button-row"><button id="previewImport" type="button">Voorbeeld bekijken</button><button id="clearImport" type="button" class="secondary">Wissen</button></div>
+      <div id="importPreview"></div>
+      <button id="confirmImport" type="button" class="success hidden">Alles importeren</button>
+    </details>
 
-    <button onclick="addPlayer()">Speler toevoegen</button>
-    <div id="managementMessage" class="notice">Nog geen wijziging uitgevoerd.</div>
-
-    <h3>Huidige spelers</h3>
-    <div id="playerList">Spelers worden geladen...</div>
+    <div id="playerList"></div>
   </section>
-</div>
 
+  <section id="statistics" class="panel tab-panel hidden">
+    <h2>Statistieken en back-up</h2>
+    <p class="muted">Er worden geen uitslagen of punten bijgehouden.</p>
+    <div class="button-row">
+      <button id="exportCsv">Export CSV</button>
+      <button id="exportXlsx">Export Excel</button>
+      <button id="exportBackup">Volledige back-up</button>
+      <label class="button file-button">Back-up herstellen<input id="restoreBackup" type="file" accept=".json"></label>
+    </div>
+    <div id="statsTable"></div>
+  </section>
+</main>
+
+<div id="toast" role="status"></div>
 <script type="module" src="app.js"></script>
 </body>
 </html>
