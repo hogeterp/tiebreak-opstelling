@@ -1,14 +1,14 @@
-# Tiebreak-opstelling v1
+# Tiebreak-opstelling — definitieve versie
 
-Bestanden voor Netlify/GitHub:
-- index.html
-- style.css
-- app.js
+Upload `index.html`, `style.css` en `app.js` naast elkaar naar de hoofdmap van GitHub.
+Netlify publiceert daarna automatisch.
 
-Extra:
-- firestore.rules bevat tijdelijke open regels. Voeg later Firebase Authentication toe voordat de app breder wordt gedeeld.
+## Belangrijk
+- De app gebruikt jullie bestaande Firebase-project.
+- Firestore moet lees- en schrijfrechten toestaan. Zie `firestore.rules`.
+- De organisatorfuncties hebben bewust geen login, om de app eenvoudig te houden.
+- Deel de website daarom alleen met de besloten tennisgroep.
+- De planning gebruikt de lokale tijd van de telefoon: iedere dinsdag om 21:00 schuiven de twee zichtbare dinsdagen door.
 
-Belangrijk:
-- De app houdt geen uitslagen of punten bij.
-- Het automatische indelingsalgoritme is een praktisch voorstel op basis van ratings en mixed-voorkeur; de organisator kan alles handmatig wijzigen.
-- Statistieken worden bijgewerkt wanneer de organisator de definitieve indeling opslaat. Druk daarom niet meerdere keren op definitief opslaan voor dezelfde speelavond.
+## Hoofdfuncties
+Spelersbeheer, unieke nummers, tekst/CSV/Excel-import, twee dinsdagen vooruit, deelnemersoverzicht, organisatorstatussen, banen, spelers/reserves, automatische en handmatige indeling, baanwisselingen tussen tiebreaks, WhatsApp-voorbeelden, statistieken, exports, back-up en logboek.
