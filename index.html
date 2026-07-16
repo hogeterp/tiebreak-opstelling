@@ -3,117 +3,228 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b7a3e">
+  <meta name="theme-color" content="#147a3e">
   <title>Tiebreak-opstelling</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-<header class="topbar">
-  <div><h1>🎾 Tiebreak-opstelling</h1><p>Dinsdag 20:00–21:30</p></div>
-  <button class="iconbtn" id="refreshBtn" title="Vernieuwen">↻</button>
-</header>
-<nav class="tabs" aria-label="Hoofdnavigatie">
-  <button data-tab="participant" class="active">Deelnemer</button>
-  <button data-tab="organizer">Organisator</button>
-  <button data-tab="players">Spelers</button>
-</nav>
-<main>
-<section id="participant" class="panel active">
-  <div class="card compact">
-    <label>Wie ben je?</label>
-    <select id="participantSelect"><option value="">Kies je naam</option></select>
-    <p id="profileHint" class="hint"></p>
-  </div>
-  <div id="upcomingParticipant"></div>
-</section>
+  <header class="topbar">
+    <div>
+      <h1>🎾 Tiebreak-opstelling</h1>
+      <p>Dinsdag 20:00–21:30</p>
+    </div>
+  </header>
 
-<section id="organizer" class="panel">
-  <div class="summary-grid" id="organizerSummary"></div>
-  <div class="card compact">
-    <div class="row between"><h2>Speelavond</h2><select id="orgDate"></select></div>
-    <div class="grid2">
-      <label>Aantal banen<input id="courtCount" type="number" min="1" max="10" value="5"></label>
-      <label>Max. spelers<input id="maxPlayers" type="text" readonly></label>
-    </div>
-    <button id="saveEveningBtn">Instellingen opslaan</button>
-  </div>
-  <div class="card compact">
-    <h2>Aanmeldingen</h2>
-    <div id="organizerResponses"></div>
-  </div>
-  <div class="card compact">
-    <div class="row between"><h2>Deelnemersveld</h2><button id="proposeFieldBtn">Voorstel</button></div>
-    <div class="two-columns">
-      <div><h3>Speelt</h3><div id="playingList" class="move-list"></div></div>
-      <div><h3>Reserve</h3><div id="reserveList" class="move-list"></div></div>
-    </div>
-    <div class="row wrap">
-      <button id="generateScheduleBtn">Automatische indeling</button>
-      <button id="manualScheduleBtn" class="secondary">Handmatig maken</button>
-    </div>
-    <div id="scheduleOutput"></div>
-  </div>
-  <div class="card compact">
-    <h2>WhatsApp</h2>
-    <div class="button-grid">
-      <button data-wa="invite">Uitnodiging</button>
-      <button data-wa="spots">Nog spelers gezocht</button>
-      <button data-wa="urgent" class="danger">Dringend invaller</button>
-      <button data-wa="reminder">Herinnering</button>
-      <button data-wa="details">Gegevens aanvullen</button>
-      <button data-wa="schedule">Definitieve indeling</button>
-    </div>
-  </div>
-  <details class="card compact">
-    <summary><strong>Statistieken</strong></summary>
-    <div id="statistics"></div>
-    <div class="row wrap">
-      <button id="exportCsvBtn" class="secondary">CSV export</button>
-      <button id="exportXlsxBtn" class="secondary">Excel export</button>
-      <button id="backupBtn" class="secondary">Back-up</button>
-    </div>
-  </details>
-  <details class="card compact">
-    <summary><strong>Logboek</strong></summary>
-    <div id="logbook"></div>
-  </details>
-</section>
+  <nav class="main-tabs" aria-label="Hoofdmenu">
+    <button id="tabParticipant" class="active" type="button">Deelnemer</button>
+    <button id="tabOrganizer" type="button">Organisator</button>
+  </nav>
 
-<section id="players" class="panel">
-  <div class="card compact">
-    <h2>Speler toevoegen of wijzigen</h2>
-    <input type="hidden" id="editPlayerId">
-    <div class="grid2">
-      <label>Voornaam<input id="firstName"></label>
-      <label>Achternaam<input id="lastName"></label>
-      <label>Geslacht<select id="gender"><option value=""></option><option>Man</option><option>Vrouw</option></select></label>
-      <label>KNLTB-dubbelrating<input id="rating" type="number" min="1" max="9" step="0.1"></label>
-    </div>
-    <div class="row wrap"><button id="savePlayerBtn">Opslaan</button><button id="cancelEditBtn" class="secondary hidden">Annuleren</button></div>
-  </div>
-  <div class="card compact">
-    <h2>Bulkimport</h2>
-    <p class="hint">Tekst: één speler per regel. Of: Voornaam;Achternaam;Geslacht;Rating</p>
-    <textarea id="bulkText" rows="6" placeholder="Carel;Jacobs;Man;6.4"></textarea>
-    <label class="filelabel">CSV/Excel kiezen<input id="importFile" type="file" accept=".csv,.xlsx,.xls"></label>
-    <div class="row wrap"><button id="previewImportBtn">Voorbeeld</button><button id="confirmImportBtn" class="secondary" disabled>Importeren</button></div>
-    <div id="importPreview"></div>
-  </div>
-  <div class="card compact">
-    <h2>Spelerslijst</h2>
-    <div id="playersList"></div>
-  </div>
-</section>
-</main>
+  <main>
+    <section id="participantView">
+      <div class="card compact">
+        <label for="participantPlayer">Wie ben je?</label>
+        <select id="participantPlayer">
+          <option value="">Kies je naam</option>
+        </select>
+      </div>
+      <div id="participantDates"></div>
+    </section>
 
-<div id="waModal" class="modal hidden" role="dialog" aria-modal="true">
-  <div class="modalbox">
-    <div class="row between"><h2>WhatsApp-voorbeeld</h2><button id="closeWaBtn" class="iconbtn">✕</button></div>
-    <textarea id="waPreview" rows="14"></textarea>
-    <div class="row wrap"><button id="openWaBtn">Open WhatsApp</button><button id="copyWaBtn" class="secondary">Kopieer tekst</button></div>
-  </div>
-</div>
-<script type="module" src="app.js"></script>
+    <section id="organizerView" class="hidden">
+      <div id="pinGate" class="card pin-card">
+        <h2>Organisator</h2>
+        <p id="pinHelp">Voer de 4-cijferige pincode in.</p>
+        <input id="pinInput" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="••••" aria-label="Pincode">
+        <button id="pinSubmit" type="button">Open organisator</button>
+        <div id="pinMessage" class="message hidden"></div>
+      </div>
+
+      <div id="organizerApp" class="hidden">
+        <nav class="sub-tabs" aria-label="Organisatormenu">
+          <button data-org-tab="evening" class="active" type="button">Speelavond</button>
+          <button data-org-tab="schedule" type="button">Indeling</button>
+          <button data-org-tab="whatsapp" type="button">WhatsApp</button>
+          <button data-org-tab="manage" type="button">Beheer</button>
+        </nav>
+
+        <section id="org-evening" class="org-panel">
+          <div id="dashboard" class="dashboard"></div>
+          <div class="card">
+            <div class="row between">
+              <h2>Speelavond</h2>
+              <select id="orgDateSelect" class="date-select"></select>
+            </div>
+
+            <div class="field-grid">
+              <div>
+                <label for="courtCount">Aantal banen</label>
+                <select id="courtCount">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4" selected>4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10">10</option>
+                </select>
+              </div>
+              <div>
+                <label>Maximaal spelers</label>
+                <div id="maxPlayers" class="readonly">16</div>
+              </div>
+            </div>
+
+            <label>Welke banen?</label>
+            <div id="courtPicker" class="court-picker"></div>
+            <div id="courtMessage" class="message hidden"></div>
+          </div>
+
+          <div class="card">
+            <h2>Aanmeldingen aanpassen</h2>
+            <div id="organizerStatuses" class="status-list"></div>
+          </div>
+        </section>
+
+        <section id="org-schedule" class="org-panel hidden">
+          <div class="card">
+            <div class="row between wrap">
+              <h2>Deelnemersveld</h2>
+              <select id="scheduleDateSelect" class="date-select"></select>
+            </div>
+            <div class="action-row">
+              <button id="autoSelection" type="button">Automatische selectie</button>
+              <button id="manualSelection" class="secondary" type="button">Selectie wijzigen</button>
+            </div>
+            <div id="selectionSummary" class="selection-summary"></div>
+          </div>
+
+          <div class="card">
+            <div class="row between wrap">
+              <h2>Indeling</h2>
+              <div class="action-row">
+                <button id="autoSchedule" type="button">Automatische indeling</button>
+                <button id="manualSchedule" class="secondary" type="button">Zelf indelen</button>
+              </div>
+            </div>
+            <div id="scheduleOutput"></div>
+          </div>
+        </section>
+
+        <section id="org-whatsapp" class="org-panel hidden">
+          <div class="card">
+            <h2>WhatsApp</h2>
+            <label for="whatsappDateSelect">Speelavond</label>
+            <select id="whatsappDateSelect" class="date-select"></select>
+            <div class="whatsapp-grid">
+              <button data-message="invite" type="button">Uitnodiging</button>
+              <button data-message="spots" type="button">Nog plekken vrij</button>
+              <button data-message="urgent" type="button">Dringend invaller</button>
+              <button data-message="reminder" type="button">Nog niet gereageerd</button>
+              <button data-message="final" type="button">Definitieve indeling</button>
+              <button data-message="incomplete" type="button">Gegevens aanvullen</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="org-manage" class="org-panel hidden">
+          <details class="card" open>
+            <summary>Spelers beheren</summary>
+            <div class="field-grid four">
+              <div><label for="firstName">Voornaam</label><input id="firstName" type="text"></div>
+              <div><label for="lastName">Achternaam</label><input id="lastName" type="text"></div>
+              <div>
+                <label for="gender">Geslacht</label>
+                <select id="gender"><option value=""></option><option>Man</option><option>Vrouw</option></select>
+              </div>
+              <div><label for="rating">KNLTB-rating</label><input id="rating" type="text" inputmode="decimal" placeholder="bijv. 6,4"></div>
+            </div>
+            <input id="editingPlayerId" type="hidden">
+            <div class="action-row">
+              <button id="savePlayer" type="button">Speler opslaan</button>
+              <button id="cancelEdit" class="secondary hidden" type="button">Annuleren</button>
+            </div>
+            <div id="playerFormMessage" class="message hidden"></div>
+            <div id="playerAdminList" class="player-admin-list"></div>
+          </details>
+
+          <details class="card">
+            <summary>Importeren en exporteren</summary>
+            <label for="bulkText">Tekst plakken — één speler per regel</label>
+            <textarea id="bulkText" rows="6" placeholder="Carel;Jacobs;Man;6,4"></textarea>
+            <div class="action-row">
+              <button id="importText" type="button">Tekst importeren</button>
+              <label class="file-button">CSV/Excel kiezen<input id="importFile" type="file" accept=".csv,.xlsx,.xls"></label>
+            </div>
+            <div id="importPreview"></div>
+            <div class="action-row">
+              <button id="confirmImport" class="hidden" type="button">Import bevestigen</button>
+              <button id="exportCsv" class="secondary" type="button">Spelers naar CSV</button>
+              <button id="exportBackup" class="secondary" type="button">Volledige back-up</button>
+            </div>
+          </details>
+
+          <details class="card">
+            <summary>Statistieken</summary>
+            <div id="statistics"></div>
+          </details>
+
+          <details class="card">
+            <summary>Instellingen</summary>
+            <div class="field-grid">
+              <div><label for="oldPin">Huidige pincode</label><input id="oldPin" type="password" inputmode="numeric" maxlength="4"></div>
+              <div><label for="newPin">Nieuwe pincode</label><input id="newPin" type="password" inputmode="numeric" maxlength="4"></div>
+            </div>
+            <div class="action-row">
+              <button id="changePin" type="button">Pincode wijzigen</button>
+              <button id="logoutOrganizer" class="danger" type="button">Uitloggen</button>
+            </div>
+            <div id="settingsMessage" class="message hidden"></div>
+          </details>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="selectionDialog">
+    <form method="dialog" class="dialog-card">
+      <h2>Selectie wijzigen</h2>
+      <p>Kies wie speelt. Het aantal moet een veelvoud van 4 zijn en mag niet hoger zijn dan het aantal beschikbare plekken.</p>
+      <div id="selectionEditor"></div>
+      <div class="dialog-actions">
+        <button id="saveSelection" type="button">Opslaan</button>
+        <button value="cancel" class="secondary">Annuleren</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="manualDialog">
+    <form method="dialog" class="dialog-card wide">
+      <h2>Zelf indelen</h2>
+      <p>Kies per baan vier verschillende spelers. De tweede tiebreak wisselt automatisch partners en banen.</p>
+      <div id="manualEditor"></div>
+      <div class="dialog-actions">
+        <button id="saveManualSchedule" type="button">Indeling opslaan</button>
+        <button value="cancel" class="secondary">Annuleren</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="whatsappDialog">
+    <form method="dialog" class="dialog-card">
+      <h2>WhatsApp-voorbeeld</h2>
+      <textarea id="whatsappPreview" rows="14"></textarea>
+      <div class="dialog-actions">
+        <button id="openWhatsApp" type="button">Open WhatsApp</button>
+        <button value="cancel" class="secondary">Annuleren</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
 </body>
 </html>
