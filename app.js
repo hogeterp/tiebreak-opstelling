@@ -643,37 +643,81 @@ async function buildMessage(type,date) {
   const counts=getCounts(date);
   const selection=state.selections[date];
   const schedule=state.schedules[date];
-  const readableDate=capitalize(formatDate(date));
-  const title=`*Tiebreak-opstelling*\nDatum: ${readableDate}\nTijd: ${settings.start}-${settings.end}`;
+  const shortDate=capitalize(new Intl.DateTimeFormat("nl-NL",{
+    weekday:"long",day:"numeric",month:"long"
+  }).format(parseLocalDate(date)));
+  const timeText=`${settings.start.replace(":", ".")} tot ${settings.end.replace(":", ".")} uur`;
+  const appText=`Open de app:\n${APP_URL}`;
 
   if (type==="invite") {
-    return `${title}\n\nBeste tennissers,\n\nLaat via de app weten of je:\n- Meedoet\n- Misschien kunt\n- Niet kunt\n\nEr hebben zich al ${counts.yes} spelers aangemeld.\n\n${APP_URL}`;
+    const lines=[
+      "Tiebreak-opstelling","",
+      "Beste tennissers,","",
+      `${shortDate} spelen we weer!`,"",
+      `Tijd: ${timeText}.`,"",
+      "Laat via de app weten of je erbij bent."
+    ];
+    if (counts.yes>0) lines.push("",`Er hebben zich al ${counts.yes} spelers aangemeld.`);
+    const free=Math.max(0,settings.courtCount*4-counts.yes);
+    if (free>0) lines.push(`Er ${free===1?"is":"zijn"} nog ${free} ${free===1?"plaats":"plaatsen"} beschikbaar.`);
+    lines.push("",appText);
+    return lines.join("\n");
   }
 
   if (type==="spots") {
     const free=Math.max(0,settings.courtCount*4-counts.yes);
-    return `${title}\n\nEr ${free===1?"is":"zijn"} nog *${free}* ${free===1?"plaats":"plaatsen"} beschikbaar.\n\nZin om mee te spelen? Geef je beschikbaarheid door via:\n\n${APP_URL}`;
+    return [
+      "Tiebreak-opstelling","",
+      `Er ${free===1?"is":"zijn"} nog ${free} ${free===1?"plaats":"plaatsen"} beschikbaar voor ${shortDate.toLowerCase()}.`,"",
+      "Lijkt het je leuk om mee te spelen? Meld je dan aan via de app.","",
+      appText
+    ].join("\n");
   }
 
   if (type==="urgent") {
-    return `${title}\n\nEr is onverwacht een plaats vrijgekomen.\n\nKun jij meespelen? Laat het direct weten via:\n\n${APP_URL}`;
+    return [
+      "Tiebreak-opstelling","",
+      `Er is onverwacht een plaats vrijgekomen voor ${shortDate.toLowerCase()}.`,"",
+      "Kun je meespelen? Laat het zo snel mogelijk weten via de app.","",
+      appText
+    ].join("\n");
   }
 
   if (type==="reminder") {
     const names=groupedNames(date,"none");
-    return `${title}\n\nWe missen nog een reactie van:\n\n${names.map(n=>`- ${n}`).join("\n")||"Iedereen heeft gereageerd."}\n\nWillen jullie je beschikbaarheid nog even doorgeven?\n\n${APP_URL}`;
+    const lines=[
+      "Tiebreak-opstelling","",
+      "Beste tennissers,","",
+      `We missen nog een reactie voor ${shortDate.toLowerCase()}.`
+    ];
+    if (names.length) lines.push("",...names.map(n=>`- ${n}`));
+    lines.push("","Willen jullie je beschikbaarheid vandaag nog even doorgeven?","",appText);
+    return lines.join("\n");
   }
 
   if (type==="incomplete") {
     const incomplete=state.players.filter(p=>missingFields(p).length);
-    return `*Tiebreak-opstelling*\n\nWil je je gegevens in de app aanvullen?\n\n${incomplete.map(p=>`- ${displayName(p)}: ${missingFields(p).join(", ")}`).join("\n")||"Alle gegevens zijn compleet."}\n\n${APP_URL}`;
+    return [
+      "Tiebreak-opstelling","",
+      "Wil je je gegevens in de app aanvullen?","",
+      ...(incomplete.length?incomplete.map(p=>`- ${displayName(p)}: ${missingFields(p).join(", ")}`):["Alle gegevens zijn compleet."]),
+      "",appText
+    ].join("\n");
   }
 
   if (type==="final") {
-    if (!schedule) return `${title}\n\nEr is nog geen definitieve indeling gemaakt.`;
-    const lines=[title,"","De indeling is bekend. Veel speelplezier!",""];
+    if (!schedule) return [
+      "Tiebreak-opstelling","",
+      `Er is nog geen definitieve indeling gemaakt voor ${shortDate.toLowerCase()}.`
+    ].join("\n");
+
+    const lines=[
+      "Tiebreak-opstelling","",
+      `De indeling voor ${shortDate.toLowerCase()} is bekend.`,"",
+      "Veel speelplezier en een fijne tennisavond!",""
+    ];
     [["Tiebreak 1",schedule.round1],["Tiebreak 2",schedule.round2]].forEach(([label,round])=>{
-      lines.push(`*${label}*`);
+      lines.push(label);
       round.forEach(c=>lines.push(`Baan ${c.court}: ${teamText(c.team1)} tegen ${teamText(c.team2)}`));
       lines.push("");
     });
@@ -681,7 +725,7 @@ async function buildMessage(type,date) {
     return lines.join("\n");
   }
 
-  return title;
+  return "Tiebreak-opstelling";
 }
 
 async function openMessagePreview(type) {
