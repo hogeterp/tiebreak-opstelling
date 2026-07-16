@@ -15,7 +15,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const APP_URL = "https://tiebreak-opstelling.netlify.app";
+const APP_URL = "https://hogeterp.github.io/tiebreak-opstelling/";
 
 const $ = id => document.getElementById(id);
 const state = {
@@ -643,24 +643,35 @@ async function buildMessage(type,date) {
   const counts=getCounts(date);
   const selection=state.selections[date];
   const schedule=state.schedules[date];
-  const title=`🎾 Tiebreak-opstelling\n📅 ${capitalize(formatDate(date))}\n🕗 ${settings.start}–${settings.end}`;
-  if (type==="invite") return `${title}\n\nWie doet er mee? Geef je beschikbaarheid door in de app:\n${APP_URL}`;
+  const readableDate=capitalize(formatDate(date));
+  const title=`🎾 *Tiebreak-opstelling*\n📅 ${readableDate}\n🕗 ${settings.start}–${settings.end}`;
+
+  if (type==="invite") {
+    return `${title}\n\nBeste tennissers,\n\nLaat via de app weten of je:\n🟢 Meedoet\n🟠 Misschien kunt\n🔴 Niet kunt\n\nEr hebben zich al ${counts.yes} spelers aangemeld.\n\n👉 ${APP_URL}`;
+  }
+
   if (type==="spots") {
     const free=Math.max(0,settings.courtCount*4-counts.yes);
-    return `${title}\n\nEr ${free===1?"is":"zijn"} nog ${free} ${free===1?"plek":"plekken"} beschikbaar. Wie wil er nog meedoen?\n${APP_URL}`;
+    return `${title}\n\nEr ${free===1?"is":"zijn"} nog *${free}* ${free===1?"plaats":"plaatsen"} beschikbaar.\n\nZin om mee te spelen? Geef je beschikbaarheid door via:\n\n👉 ${APP_URL}`;
   }
-  if (type==="urgent") return `${title}\n\n🚨 Er is op het laatste moment een plek vrijgekomen. Wie kan er dringend invallen?\n${APP_URL}`;
+
+  if (type==="urgent") {
+    return `${title}\n\n🚨 Er is onverwacht een plaats vrijgekomen.\n\nKun jij meespelen? Laat het direct weten via:\n\n👉 ${APP_URL}`;
+  }
+
   if (type==="reminder") {
     const names=groupedNames(date,"none");
-    return `${title}\n\nDe volgende spelers hebben nog niet gereageerd:\n${names.map(n=>`• ${n}`).join("\n")||"Iedereen heeft gereageerd."}\n\nGeef je keuze door in de app:\n${APP_URL}`;
+    return `${title}\n\nWe missen nog een reactie van:\n\n${names.map(n=>`• ${n}`).join("\n")||"Iedereen heeft gereageerd."}\n\nWillen jullie je beschikbaarheid nog even doorgeven?\n\n👉 ${APP_URL}`;
   }
+
   if (type==="incomplete") {
     const incomplete=state.players.filter(p=>missingFields(p).length);
-    return `🎾 Tiebreak-opstelling\n\nWil je je gegevens in de app aanvullen?\n\n${incomplete.map(p=>`• ${displayName(p)}: ${missingFields(p).join(", ")}`).join("\n")||"Alle gegevens zijn compleet."}\n\nApp:\n${APP_URL}`;
+    return `🎾 *Tiebreak-opstelling*\n\nWil je je gegevens in de app aanvullen?\n\n${incomplete.map(p=>`• ${displayName(p)}: ${missingFields(p).join(", ")}`).join("\n")||"Alle gegevens zijn compleet."}\n\n👉 ${APP_URL}`;
   }
+
   if (type==="final") {
     if (!schedule) return `${title}\n\nEr is nog geen definitieve indeling gemaakt.`;
-    const lines=[title,""];
+    const lines=[title,"","De indeling is bekend. Veel speelplezier! 💪🎾",""];
     [["Tiebreak 1",schedule.round1],["Tiebreak 2",schedule.round2]].forEach(([label,round])=>{
       lines.push(`*${label}*`);
       round.forEach(c=>lines.push(`Baan ${c.court}: ${teamText(c.team1)} tegen ${teamText(c.team2)}`));
@@ -669,6 +680,7 @@ async function buildMessage(type,date) {
     if (selection?.reserveIds?.length) lines.push(`Reserve: ${selection.reserveIds.map(id=>displayName(playerById(id))).join(", ")}`);
     return lines.join("\n");
   }
+
   return title;
 }
 
