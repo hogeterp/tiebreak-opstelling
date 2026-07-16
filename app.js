@@ -536,103 +536,196 @@ function renderSchedule(date) {
 
 async function openManualEditor(date) {
   const selection=state.selections[date];
-  if (!selection || selection.playingIds.length<4){alert("Maak eerst een deelnemersselectie.");return}
+  if (!selection || selection.playingIds.length<4){
+    alert("Maak eerst een deelnemersselectie.");
+    return;
+  }
+
   const settings=await loadEveningSettings(date);
   const courtCount=Math.min(settings.courts.length,Math.floor(selection.playingIds.length/4));
-  const options=selection.playingIds.map(id=>`<option value="${id}">${escapeHtml(displayName(playerById(id)))}</option>`).join("");
+  const courts=settings.courts.slice(0,courtCount);
+  const playerOptions=selection.playingIds
+    .map(id=>`<option value="${id}">${escapeHtml(displayName(playerById(id)))}</option>`)
+    .join("");
+
+  const emptyOption='<option value="">Kies speler</option>';
   const existing=state.schedules[date];
-  $("manualEditor").innerHTML=Array.from({length:courtCount},(_,i)=>{
-    const court=settings.courts[i];
-    const ids=existing?.round1?.[i]?.players || selection.playingIds.slice(i*4,i*4+4);
-    return `<div class="manual-court" data-court="${court}">
-      <strong>Baan ${court}</strong>
-      <div class="manual-team">
-        <span class="manual-team-label">Team 1</span>
-        <div class="manual-grid">
-          ${ids.slice(0,2).map((id,j)=>`<select data-slot="${j}">${options}</select>`).join("")}
+
+  function roundEditor(roundNumber, roundData) {
+    return `
+      <section class="manual-round" data-round="${roundNumber}">
+        <h3>Tiebreak ${roundNumber}</h3>
+        <div class="manual-round-courts">
+          ${courts.map((court,index)=>{
+            const existingCourt=(roundData||[]).find(item=>Number(item.court)===Number(court));
+            const team1=existingCourt?.team1||[];
+            const team2=existingCourt?.team2||[];
+            const values=[team1[0]||"",team1[1]||"",team2[0]||"",team2[1]||""];
+
+            return `
+              <div class="manual-court" data-round="${roundNumber}" data-court="${court}">
+                <strong>Baan ${court}</strong>
+
+                <div class="manual-team">
+                  <span class="manual-team-label">Team 1</span>
+                  <div class="manual-grid">
+                    <select data-slot="0">${emptyOption}${playerOptions}</select>
+                    <select data-slot="1">${emptyOption}${playerOptions}</select>
+                  </div>
+                </div>
+
+                <div class="vs-line manual-vs">vs</div>
+
+                <div class="manual-team">
+                  <span class="manual-team-label">Team 2</span>
+                  <div class="manual-grid">
+                    <select data-slot="2">${emptyOption}${playerOptions}</select>
+                    <select data-slot="3">${emptyOption}${playerOptions}</select>
+                  </div>
+                </div>
+              </div>`;
+          }).join("")}
         </div>
-      </div>
-      <div class="vs-line manual-vs">vs</div>
-      <div class="manual-team">
-        <span class="manual-team-label">Team 2</span>
-        <div class="manual-grid">
-          ${ids.slice(2,4).map((id,j)=>`<select data-slot="${j+2}">${options}</select>`).join("")}
-        </div>
-      </div>
-    </div>`;
-  }).join("");
-  [...$("manualEditor").querySelectorAll(".manual-court")].forEach((card,i)=>{
-    const ids=existing?.round1?.[i]?.players || selection.playingIds.slice(i*4,i*4+4);
-    [...card.querySelectorAll("select")].forEach((sel,j)=>sel.value=ids[j]);
+      </section>`;
+  }
+
+  $("manualEditor").innerHTML=
+    roundEditor(1,existing?.round1)+
+    roundEditor(2,existing?.round2);
+
+  [...$("manualEditor").querySelectorAll(".manual-court")].forEach(card=>{
+    const roundNumber=Number(card.dataset.round);
+    const courtNumber=Number(card.dataset.court);
+    const roundData=roundNumber===1?existing?.round1:existing?.round2;
+    const existingCourt=(roundData||[]).find(item=>Number(item.court)===courtNumber);
+    const values=[
+      existingCourt?.team1?.[0]||"",
+      existingCourt?.team1?.[1]||"",
+      existingCourt?.team2?.[0]||"",
+      existingCourt?.team2?.[1]||""
+    ];
+    [...card.querySelectorAll("select")].forEach((select,index)=>{
+      select.value=values[index];
+      select.addEventListener("change",validateManualEditor);
+    });
   });
+
   $("manualDialog").dataset.date=date;
+  validateManualEditor();
   $("manualDialog").showModal();
 }
 
+function readManualRound(roundNumber) {
+  const cards=[...$("manualEditor").querySelectorAll(`.manual-court[data-round="${roundNumber}"]`)];
+  return cards.map(card=>{
+    const values=[...card.querySelectorAll("select")].map(select=>select.value);
+    return {
+      court:Number(card.dataset.court),
+      team1:[values[0],values[1]],
+      team2:[values[2],values[3]],
+      players:values
+    };
+  });
+}
+
+function validateManualEditor() {
+  const date=$("manualDialog").dataset.date;
+  const selection=state.selections[date];
+  const selectedIds=selection?.playingIds||[];
+  const selectedSet=new Set(selectedIds);
+  const problems=[];
+
+  [1,2].forEach(roundNumber=>{
+    const round=readManualRound(roundNumber);
+    const allIds=round.flatMap(court=>court.players);
+    const filled=allIds.filter(Boolean);
+
+    if (allIds.some(id=>!id)) {
+      problems.push(`Tiebreak ${roundNumber}: nog niet alle plekken zijn ingevuld.`);
+    }
+
+    const duplicates=filled.filter((id,index)=>filled.indexOf(id)!==index);
+    if (duplicates.length) {
+      const duplicateNames=[...new Set(duplicates)]
+        .map(id=>displayName(playerById(id)))
+        .join(", ");
+      problems.push(`Tiebreak ${roundNumber}: dubbel gekozen: ${duplicateNames}.`);
+    }
+
+    const missing=selectedIds.filter(id=>!filled.includes(id));
+    if (missing.length) {
+      problems.push(
+        `Tiebreak ${roundNumber}: nog in te delen: ${missing.map(id=>displayName(playerById(id))).join(", ")}.`
+      );
+    }
+
+    const unknown=filled.filter(id=>!selectedSet.has(id));
+    if (unknown.length) {
+      problems.push(`Tiebreak ${roundNumber}: bevat een speler buiten de selectie.`);
+    }
+  });
+
+  const status=$("manualStatus");
+  const saveButton=$("saveManualSchedule");
+  const valid=problems.length===0;
+
+  if (valid) {
+    status.className="manual-status success";
+    status.innerHTML="Alle spelers zijn in beide tiebreaks precies één keer ingedeeld.";
+  } else {
+    status.className="manual-status error";
+    status.innerHTML=problems.map(problem=>`<div>${escapeHtml(problem)}</div>`).join("");
+  }
+
+  saveButton.disabled=!valid;
+  return valid;
+}
+
 async function saveManualSchedule() {
-  const date = $("manualDialog").dataset.date;
+  const date=$("manualDialog").dataset.date;
+
+  if (!validateManualEditor()) {
+    alert("Maak eerst beide tiebreaks volledig en zonder dubbele spelers.");
+    return;
+  }
+
   try {
-    const courtCards = [...$("manualEditor").querySelectorAll(".manual-court")];
-    const used = [];
+    const round1=readManualRound(1).map(court=>({
+      court:court.court,
+      players:[...court.players],
+      team1:[...court.team1],
+      team2:[...court.team2]
+    }));
 
-    const groups = courtCards.map(card => {
-      const ids = [...card.querySelectorAll("select")].map(s => s.value);
-      used.push(...ids);
-      return { court: Number(card.dataset.court), ids };
-    });
+    const round2=readManualRound(2).map(court=>({
+      court:court.court,
+      players:[...court.players],
+      team1:[...court.team1],
+      team2:[...court.team2]
+    }));
 
-    if (new Set(used).size !== used.length) {
-      alert("Een speler staat meer dan één keer in de indeling.");
-      return;
-    }
-    if (groups.some(g => new Set(g.ids).size !== 4)) {
-      alert("Iedere baan moet vier verschillende spelers hebben.");
-      return;
-    }
-
-    const courts = groups.map(g => g.court);
-    const round1 = [];
-    const round2 = [];
-
-    groups.forEach((g, i) => {
-      const ps = g.ids.map(playerById);
-      const pairs = pairingsForGroup(ps);
-      round1.push({
-        court: g.court,
-        players: g.ids,
-        team1: pairs.round1[0].map(p => p.id),
-        team2: pairs.round1[1].map(p => p.id)
-      });
-      round2.push({
-        court: courts[(i + 1) % courts.length],
-        players: g.ids,
-        team1: pairs.round2[0].map(p => p.id),
-        team2: pairs.round2[1].map(p => p.id)
-      });
-    });
-
-    const schedule = {
+    const schedule={
       date,
       round1,
       round2,
-      createdAt: new Date().toISOString(),
-      mode: "manual"
+      createdAt:new Date().toISOString(),
+      mode:"manual"
     };
 
-    await setDoc(doc(db, "schedules", date), {
-      scheduleJson: JSON.stringify(schedule),
+    await setDoc(doc(db,"schedules",date),{
+      scheduleJson:JSON.stringify(schedule),
       date,
-      mode: "manual",
-      updatedAt: serverTimestamp()
+      mode:"manual",
+      updatedAt:serverTimestamp()
     });
 
-    state.schedules[date] = schedule;
-    await logAction("handmatige_indeling", { date });
+    state.schedules[date]=schedule;
+    await logAction("handmatige_indeling",{date});
     $("manualDialog").close();
     renderSchedule(date);
   } catch (error) {
-    console.error("Handmatige indeling mislukt:", error);
-    alert(`Indeling opslaan mislukt: ${error.message || "onbekende fout"}`);
+    console.error("Handmatige indeling mislukt:",error);
+    alert(`Indeling opslaan mislukt: ${error.message||"onbekende fout"}`);
   }
 }
 

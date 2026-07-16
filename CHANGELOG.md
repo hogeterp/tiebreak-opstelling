@@ -1,8 +1,13 @@
 # Wijzigingen
 
-## v1.0.6
-- In de automatische indeling staat nu duidelijk 'vs' tussen beide teams.
-- De teams worden gecentreerd en compacter weergegeven.
-- Bij Zelf indelen staan Team 1 en Team 2 duidelijk boven de keuzelijsten.
-- Ook daar staat compact 'vs' tussen beide teams.
-- Indelingslogica, Firebase en WhatsApp zijn niet gewijzigd.
+## v1.1.0
+- Zelf indelen volledig vernieuwd.
+- Alle banen kunnen afzonderlijk worden ingevuld voor Tiebreak 1.
+- Alle banen kunnen afzonderlijk worden ingevuld voor Tiebreak 2.
+- Team 1 en Team 2 worden exact opgeslagen zoals gekozen.
+- De app maakt handmatige teams niet meer opnieuw automatisch.
+- Controle op lege plekken.
+- Controle op dubbele spelers per tiebreak.
+- Controle op vergeten spelers per tiebreak.
+- Opslaan kan pas wanneer beide tiebreaks volledig geldig zijn.
+- Automatische indeling en Firebase-basislogica blijven bestaan.
