@@ -1,7 +1,11 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Tijdelijk voor de besloten groep. Voeg later Firebase Authentication toe.
-    match /{document=**} { allow read, write: if true; }
+    // Tijdelijke regels voor een besloten groep zonder Firebase Authentication.
+    // De 4-cijferige pincode beschermt alleen de gebruikersinterface.
+    // Voor echte beveiliging is Firebase Authentication nodig.
+    match /{document=**} {
+      allow read, write: if true;
+    }
   }
 }
