@@ -1,4 +1,4 @@
-# Tiebreak-opstelling — gecontroleerde versie
+# Tiebreak-opstelling v1.0.1
 
 ## Bestanden voor GitHub
 Vervang in je repository:
@@ -36,3 +36,10 @@ Deel de app daarom alleen met de eigen groep.
 - Datumlogica gebruikt lokale tijd en levert alleen dinsdagen.
 - Bestandsverwijzingen zijn gecontroleerd.
 - ZIP-integriteit is gecontroleerd.
+
+
+## Versie
+Deze release is **v1.0.1**.
+
+De versie staat zichtbaar onder de titel van de app. Zo kun je na een Netlify-publicatie
+controleren of de browser de nieuwste versie toont.
