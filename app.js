@@ -459,9 +459,9 @@ async function automaticSchedule(date) {
   const round1=[], round2=[];
   groups.forEach((group,i)=>{
     const pairs=pairingsForGroup(group);
-    round1.push({court:courts[i],players:group.map(p=>p.id),teams:pairs.round1.map(t=>t.map(p=>p.id))});
+    round1.push({court:courts[i],players:group.map(p=>p.id),team1:pairs.round1[0].map(p=>p.id),team2:pairs.round1[1].map(p=>p.id)});
     const shiftedCourt=courts[(i+1)%courts.length];
-    round2.push({court:shiftedCourt,players:group.map(p=>p.id),teams:pairs.round2.map(t=>t.map(p=>p.id))});
+    round2.push({court:shiftedCourt,players:group.map(p=>p.id),team1:pairs.round2[0].map(p=>p.id),team2:pairs.round2[1].map(p=>p.id)});
   });
   const schedule={date,round1,round2,createdAt:new Date().toISOString(),mode:"automatic"};
   state.schedules[date]=schedule;
@@ -478,8 +478,8 @@ function renderSchedule(date) {
   if (!s) {$("scheduleOutput").innerHTML="<p>Nog geen indeling gemaakt.</p>";return}
   const renderRound=(title,round)=>`<div class="round"><h3>${title}</h3><div class="courts-grid">${round.map(c=>`
     <div class="court-card"><strong>Baan ${c.court}</strong>
-      <div class="match-line">${escapeHtml(teamText(c.teams[0]))}</div>
-      <div class="match-line">tegen ${escapeHtml(teamText(c.teams[1]))}</div>
+      <div class="match-line">${escapeHtml(teamText(c.team1))}</div>
+      <div class="match-line">tegen ${escapeHtml(teamText(c.team2))}</div>
     </div>`).join("")}</div></div>`;
   $("scheduleOutput").innerHTML=renderRound("Tiebreak 1",s.round1)+renderRound("Tiebreak 2 — spelers wisselen van baan",s.round2);
 }
@@ -523,8 +523,8 @@ async function saveManualSchedule() {
   groups.forEach((g,i)=>{
     const ps=g.ids.map(playerById);
     const pairs=pairingsForGroup(ps);
-    round1.push({court:g.court,players:g.ids,teams:pairs.round1.map(t=>t.map(p=>p.id))});
-    round2.push({court:courts[(i+1)%courts.length],players:g.ids,teams:pairs.round2.map(t=>t.map(p=>p.id))});
+    round1.push({court:g.court,players:g.ids,team1:pairs.round1[0].map(p=>p.id),team2:pairs.round1[1].map(p=>p.id)});
+    round2.push({court:courts[(i+1)%courts.length],players:g.ids,team1:pairs.round2[0].map(p=>p.id),team2:pairs.round2[1].map(p=>p.id)});
   });
   const schedule={date,round1,round2,createdAt:new Date().toISOString(),mode:"manual"};
   state.schedules[date]=schedule;
@@ -575,7 +575,7 @@ async function buildMessage(type,date) {
     const lines=[title,""];
     [["Tiebreak 1",schedule.round1],["Tiebreak 2",schedule.round2]].forEach(([label,round])=>{
       lines.push(`*${label}*`);
-      round.forEach(c=>lines.push(`Baan ${c.court}: ${teamText(c.teams[0])} tegen ${teamText(c.teams[1])}`));
+      round.forEach(c=>lines.push(`Baan ${c.court}: ${teamText(c.team1)} tegen ${teamText(c.team2)}`));
       lines.push("");
     });
     if (selection?.reserveIds?.length) lines.push(`Reserve: ${selection.reserveIds.map(id=>displayName(playerById(id))).join(", ")}`);
