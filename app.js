@@ -447,27 +447,76 @@ function pairingsForGroup(group) {
 }
 
 async function automaticSchedule(date) {
-  const selection = state.selections[date];
-  if (!selection || selection.playingIds.length < 4) {
-    alert("Maak eerst een deelnemersselectie."); return;
+  const output = $("scheduleOutput");
+  try {
+    const selection = state.selections[date];
+    if (!selection || selection.playingIds.length < 4) {
+      alert("Maak eerst een deelnemersselectie.");
+      return;
+    }
+
+    const settings = await loadEveningSettings(date);
+    const players = selection.playingIds
+      .map(id => state.players.find(p => p.id === id))
+      .filter(Boolean);
+
+    const availableCourts = Array.isArray(settings.courts) ? settings.courts : [];
+    const groupCount = Math.min(availableCourts.length, Math.floor(players.length / 4));
+
+    if (groupCount < 1) {
+      throw new Error("Kies eerst minimaal één baan bij Speelavond.");
+    }
+
+    const groups = makeGroups(players, groupCount);
+    if (!groups.length) {
+      throw new Error("De app kon geen geldige groepen van vier spelers maken.");
+    }
+
+    const courts = availableCourts.slice(0, groupCount);
+    const round1 = [];
+    const round2 = [];
+
+    groups.forEach((group, i) => {
+      const pairs = pairingsForGroup(group);
+      round1.push({
+        court: courts[i],
+        players: group.map(p => p.id),
+        team1: pairs.round1[0].map(p => p.id),
+        team2: pairs.round1[1].map(p => p.id)
+      });
+
+      const shiftedCourt = courts[(i + 1) % courts.length];
+      round2.push({
+        court: shiftedCourt,
+        players: group.map(p => p.id),
+        team1: pairs.round2[0].map(p => p.id),
+        team2: pairs.round2[1].map(p => p.id)
+      });
+    });
+
+    const schedule = {
+      date,
+      round1,
+      round2,
+      createdAt: new Date().toISOString(),
+      mode: "automatic"
+    };
+
+    // Firestore-veilige opslag: de complete indeling als JSON-tekst.
+    await setDoc(doc(db, "schedules", date), {
+      scheduleJson: JSON.stringify(schedule),
+      date,
+      mode: "automatic",
+      updatedAt: serverTimestamp()
+    });
+
+    state.schedules[date] = schedule;
+    await logAction("automatische_indeling", { date });
+    renderSchedule(date);
+  } catch (error) {
+    console.error("Automatische indeling mislukt:", error);
+    output.innerHTML = `<div class="message error"><strong>Indeling maken mislukt.</strong><br>${escapeHtml(error.message || "Onbekende fout")}</div>`;
   }
-  const settings = await loadEveningSettings(date);
-  const players = selection.playingIds.map(id=>state.players.find(p=>p.id===id)).filter(Boolean);
-  const groupCount = Math.min(settings.courts.length, Math.floor(players.length/4));
-  const groups = makeGroups(players,groupCount);
-  const courts = settings.courts.slice(0,groupCount);
-  const round1=[], round2=[];
-  groups.forEach((group,i)=>{
-    const pairs=pairingsForGroup(group);
-    round1.push({court:courts[i],players:group.map(p=>p.id),team1:pairs.round1[0].map(p=>p.id),team2:pairs.round1[1].map(p=>p.id)});
-    const shiftedCourt=courts[(i+1)%courts.length];
-    round2.push({court:shiftedCourt,players:group.map(p=>p.id),team1:pairs.round2[0].map(p=>p.id),team2:pairs.round2[1].map(p=>p.id)});
-  });
-  const schedule={date,round1,round2,createdAt:new Date().toISOString(),mode:"automatic"};
-  state.schedules[date]=schedule;
-  await setDoc(doc(db,"schedules",date),schedule);
-  await logAction("automatische_indeling",{date});
-  renderSchedule(date);
 }
 
 function playerById(id){return state.players.find(p=>p.id===id)}
@@ -507,31 +556,70 @@ async function openManualEditor(date) {
 }
 
 async function saveManualSchedule() {
-  const date=$("manualDialog").dataset.date;
-  const settings=await loadEveningSettings(date);
-  const courtCards=[...$("manualEditor").querySelectorAll(".manual-court")];
-  const used=[];
-  const groups=courtCards.map(card=>{
-    const ids=[...card.querySelectorAll("select")].map(s=>s.value);
-    used.push(...ids);
-    return {court:Number(card.dataset.court),ids};
-  });
-  if (new Set(used).size!==used.length){alert("Een speler staat meer dan één keer in de indeling.");return}
-  if (groups.some(g=>new Set(g.ids).size!==4)){alert("Iedere baan moet vier verschillende spelers hebben.");return}
-  const courts=groups.map(g=>g.court);
-  const round1=[],round2=[];
-  groups.forEach((g,i)=>{
-    const ps=g.ids.map(playerById);
-    const pairs=pairingsForGroup(ps);
-    round1.push({court:g.court,players:g.ids,team1:pairs.round1[0].map(p=>p.id),team2:pairs.round1[1].map(p=>p.id)});
-    round2.push({court:courts[(i+1)%courts.length],players:g.ids,team1:pairs.round2[0].map(p=>p.id),team2:pairs.round2[1].map(p=>p.id)});
-  });
-  const schedule={date,round1,round2,createdAt:new Date().toISOString(),mode:"manual"};
-  state.schedules[date]=schedule;
-  await setDoc(doc(db,"schedules",date),schedule);
-  await logAction("handmatige_indeling",{date});
-  $("manualDialog").close();
-  renderSchedule(date);
+  const date = $("manualDialog").dataset.date;
+  try {
+    const courtCards = [...$("manualEditor").querySelectorAll(".manual-court")];
+    const used = [];
+
+    const groups = courtCards.map(card => {
+      const ids = [...card.querySelectorAll("select")].map(s => s.value);
+      used.push(...ids);
+      return { court: Number(card.dataset.court), ids };
+    });
+
+    if (new Set(used).size !== used.length) {
+      alert("Een speler staat meer dan één keer in de indeling.");
+      return;
+    }
+    if (groups.some(g => new Set(g.ids).size !== 4)) {
+      alert("Iedere baan moet vier verschillende spelers hebben.");
+      return;
+    }
+
+    const courts = groups.map(g => g.court);
+    const round1 = [];
+    const round2 = [];
+
+    groups.forEach((g, i) => {
+      const ps = g.ids.map(playerById);
+      const pairs = pairingsForGroup(ps);
+      round1.push({
+        court: g.court,
+        players: g.ids,
+        team1: pairs.round1[0].map(p => p.id),
+        team2: pairs.round1[1].map(p => p.id)
+      });
+      round2.push({
+        court: courts[(i + 1) % courts.length],
+        players: g.ids,
+        team1: pairs.round2[0].map(p => p.id),
+        team2: pairs.round2[1].map(p => p.id)
+      });
+    });
+
+    const schedule = {
+      date,
+      round1,
+      round2,
+      createdAt: new Date().toISOString(),
+      mode: "manual"
+    };
+
+    await setDoc(doc(db, "schedules", date), {
+      scheduleJson: JSON.stringify(schedule),
+      date,
+      mode: "manual",
+      updatedAt: serverTimestamp()
+    });
+
+    state.schedules[date] = schedule;
+    await logAction("handmatige_indeling", { date });
+    $("manualDialog").close();
+    renderSchedule(date);
+  } catch (error) {
+    console.error("Handmatige indeling mislukt:", error);
+    alert(`Indeling opslaan mislukt: ${error.message || "onbekende fout"}`);
+  }
 }
 
 async function renderSchedulePanel() {
@@ -799,7 +887,18 @@ async function loadExistingDocs() {
     state.responses[date]={};
     respSnap.forEach(d=>state.responses[date][d.id]=d.data().status);
     if(selectionSnap.exists())state.selections[date]=selectionSnap.data();
-    if(scheduleSnap.exists())state.schedules[date]=scheduleSnap.data();
+    if (scheduleSnap.exists()) {
+      const rawSchedule = scheduleSnap.data();
+      if (rawSchedule.scheduleJson) {
+        try {
+          state.schedules[date] = JSON.parse(rawSchedule.scheduleJson);
+        } catch (error) {
+          console.error("Opgeslagen indeling kon niet worden gelezen:", error);
+        }
+      } else if (rawSchedule.round1 && rawSchedule.round2) {
+        state.schedules[date] = rawSchedule;
+      }
+    }
   }
 }
 
