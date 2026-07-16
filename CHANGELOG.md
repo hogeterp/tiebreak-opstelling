@@ -1,9 +1,8 @@
 # Wijzigingen
 
-## v1.0.1
-- Fout bij **Automatische indeling** opgelost.
-- Firestore-gegevensstructuur voor teams aangepast: geen lijsten meer binnen lijsten.
-- Dezelfde correctie toegepast op **Zelf indelen**.
-- Definitieve WhatsApp-indeling aangepast aan de herstelde teamstructuur.
-- Versienummer zichtbaar gemaakt in de app.
-- JavaScript-syntax, dinsdaglogica, bestandsverwijzingen en ZIP-integriteit gecontroleerd.
+## v1.0.3
+- Nieuwe GitHub Pages-link in alle WhatsApp-berichten.
+- Uitnodiging, herinnering, vrije-plaatsenbericht en invallerbericht verbeterd.
+- Definitieve indeling vriendelijker gemaakt.
+- Blok 'Nieuw in v1.0.3' toegevoegd.
+- Automatische selectie, automatische indeling en Firebase-logica niet gewijzigd.
