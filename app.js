@@ -527,8 +527,9 @@ function renderSchedule(date) {
   if (!s) {$("scheduleOutput").innerHTML="<p>Nog geen indeling gemaakt.</p>";return}
   const renderRound=(title,round)=>`<div class="round"><h3>${title}</h3><div class="courts-grid">${round.map(c=>`
     <div class="court-card"><strong>Baan ${c.court}</strong>
-      <div class="match-line">${escapeHtml(teamText(c.team1))}</div>
-      <div class="match-line">tegen ${escapeHtml(teamText(c.team2))}</div>
+      <div class="match-line team-line">${escapeHtml(teamText(c.team1))}</div>
+      <div class="vs-line">vs</div>
+      <div class="match-line team-line">${escapeHtml(teamText(c.team2))}</div>
     </div>`).join("")}</div></div>`;
   $("scheduleOutput").innerHTML=renderRound("Tiebreak 1",s.round1)+renderRound("Tiebreak 2 — spelers wisselen van baan",s.round2);
 }
@@ -543,9 +544,22 @@ async function openManualEditor(date) {
   $("manualEditor").innerHTML=Array.from({length:courtCount},(_,i)=>{
     const court=settings.courts[i];
     const ids=existing?.round1?.[i]?.players || selection.playingIds.slice(i*4,i*4+4);
-    return `<div class="manual-court" data-court="${court}"><strong>Baan ${court}</strong><div class="manual-grid">
-      ${ids.map((id,j)=>`<select data-slot="${j}">${options}</select>`).join("")}
-    </div></div>`;
+    return `<div class="manual-court" data-court="${court}">
+      <strong>Baan ${court}</strong>
+      <div class="manual-team">
+        <span class="manual-team-label">Team 1</span>
+        <div class="manual-grid">
+          ${ids.slice(0,2).map((id,j)=>`<select data-slot="${j}">${options}</select>`).join("")}
+        </div>
+      </div>
+      <div class="vs-line manual-vs">vs</div>
+      <div class="manual-team">
+        <span class="manual-team-label">Team 2</span>
+        <div class="manual-grid">
+          ${ids.slice(2,4).map((id,j)=>`<select data-slot="${j+2}">${options}</select>`).join("")}
+        </div>
+      </div>
+    </div>`;
   }).join("");
   [...$("manualEditor").querySelectorAll(".manual-court")].forEach((card,i)=>{
     const ids=existing?.round1?.[i]?.players || selection.playingIds.slice(i*4,i*4+4);

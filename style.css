@@ -138,3 +138,29 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   overflow:hidden;
   text-overflow:ellipsis;
 }
+
+.team-line{
+  text-align:center;
+}
+.vs-line{
+  text-align:center;
+  font-size:.72rem;
+  font-weight:700;
+  color:var(--gray);
+  text-transform:uppercase;
+  margin:3px 0;
+  letter-spacing:.04em;
+}
+.manual-team{
+  margin-top:6px;
+}
+.manual-team-label{
+  display:block;
+  font-size:.72rem;
+  font-weight:700;
+  color:var(--gray);
+  margin-bottom:4px;
+}
+.manual-vs{
+  margin:5px 0 2px;
+}
