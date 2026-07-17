@@ -1,13 +1,18 @@
 # Wijzigingen
 
-## v1.1.1
-- Bovenaan heet de app nu Supertiebreak-opstelling.
-- Tiebreak 1 en 2 gewijzigd naar Supertie Ronde 1 en 2.
-- Handmatig gekozen spelers verdwijnen binnen dezelfde ronde uit andere keuzelijsten.
-- Een verwijderde keuze wordt direct opnieuw beschikbaar.
-- Automatische en handmatige indeling lezen verse baaninstellingen uit Firebase.
-- De exacte ingestelde baannummers worden gebruikt.
-- Bij wijziging van het aantal banen worden niet meer automatisch banen 1, 2, 3 enzovoort toegevoegd.
-- Bestaande dubbele of ontbrekende spelernummers worden eenmalig veilig gecorrigeerd.
-- Firebase-speler-ID's blijven ongewijzigd; gekoppelde gegevens blijven behouden.
-- Nieuwe spelers krijgen een nummer boven het hoogste bestaande nummer.
+## v1.1.2
+- Leerbestandfunctie toegevoegd.
+- Elke handmatig opgeslagen indeling maakt automatisch een leerrecord.
+- Leerrecord bevat:
+  - datum;
+  - geselecteerde spelers;
+  - zichtbare naam en nummer;
+  - rating;
+  - geslacht;
+  - teams per baan;
+  - teamgenoten;
+  - tegenstanders;
+  - ronde en baannummer.
+- Leergegevens staan apart van de normale indelingen in Firebase.
+- Collectie: learningSchedules.
+- Automatische Supertie Ronde 2 wordt nu gesorteerd volgens exact dezelfde ingestelde baanvolgorde als Ronde 1.

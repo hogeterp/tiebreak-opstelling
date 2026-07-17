@@ -1,13 +1,14 @@
-# Supertiebreak-opstelling v1.1.1
+# Supertiebreak-opstelling v1.1.2
 
-Belangrijkste verbeteringen:
-- Tiebreaks heet nu Supertiebreaks.
-- De rondes heten Supertie Ronde 1 en Supertie Ronde 2.
-- Een gekozen speler verdwijnt binnen dezelfde ronde uit de andere keuzelijsten.
-- De indeling gebruikt de exacte banen die bij Speelavond/Beheer zijn ingesteld.
-- Dubbele bestaande spelernummers worden eenmalig veilig hernummerd.
-- Nieuwe spelers krijgen altijd het eerstvolgende unieke nummer.
-- De technische Firebase-ID van iedere speler blijft gelijk, zodat beschikbaarheid en indelingen behouden blijven.
+Nieuwe functies en fixes:
+- Handmatige indelingen worden ook opgeslagen als leergegevens.
+- De leergegevens bevatten spelers, rating, geslacht, teams, tegenstanders, rondes en banen.
+- De gewone indeling blijft daarnaast ongewijzigd opgeslagen.
+- Automatische ronde 2 houdt exact dezelfde baanvolgorde als de ingestelde banen.
+
+De leergegevens worden opgeslagen in Firebase in:
+- collectie: learningSchedules
+- document-ID: datum van de speelavond
 
 Upload naar GitHub:
 - index.html

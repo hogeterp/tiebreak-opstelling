@@ -709,6 +709,61 @@ function validateManualEditor() {
   return valid;
 }
 
+
+function buildLearningRecord(date, round1, round2) {
+  const selection=state.selections[date];
+  const playerSnapshot=(selection?.playingIds||[]).map(id=>{
+    const player=playerById(id);
+    return {
+      playerId:id,
+      number:Number(player?.number||0),
+      name:displayName(player),
+      gender:player?.gender||"",
+      rating:player?.rating??null
+    };
+  });
+
+  function enrichRound(roundNumber, courts) {
+    return courts.map(court=>({
+      round:roundNumber,
+      court:Number(court.court),
+      team1:[...court.team1],
+      team2:[...court.team2],
+      teammatePairs:[
+        [...court.team1],
+        [...court.team2]
+      ],
+      opponentPairs:[
+        [court.team1[0],court.team2[0]],
+        [court.team1[0],court.team2[1]],
+        [court.team1[1],court.team2[0]],
+        [court.team1[1],court.team2[1]]
+      ]
+    }));
+  }
+
+  return {
+    date,
+    source:"manual",
+    createdAt:new Date().toISOString(),
+    playerSnapshot,
+    rounds:[
+      ...enrichRound(1,round1),
+      ...enrichRound(2,round2)
+    ]
+  };
+}
+
+async function saveLearningRecord(date, round1, round2) {
+  const learningRecord=buildLearningRecord(date,round1,round2);
+  await setDoc(doc(db,"learningSchedules",date),{
+    learningJson:JSON.stringify(learningRecord),
+    date,
+    source:"manual",
+    updatedAt:serverTimestamp()
+  });
+}
+
 async function saveManualSchedule() {
   const date=$("manualDialog").dataset.date;
 
@@ -732,6 +787,9 @@ async function saveManualSchedule() {
       team2:[...court.team2]
     }));
 
+    round1.sort((a,b)=>settings.courts.indexOf(Number(a.court))-settings.courts.indexOf(Number(b.court)));
+    round2.sort((a,b)=>settings.courts.indexOf(Number(a.court))-settings.courts.indexOf(Number(b.court)));
+
     const schedule={
       date,
       round1,
@@ -747,8 +805,10 @@ async function saveManualSchedule() {
       updatedAt:serverTimestamp()
     });
 
+    await saveLearningRecord(date,round1,round2);
+
     state.schedules[date]=schedule;
-    await logAction("handmatige_indeling",{date});
+    await logAction("handmatige_indeling",{date,learningRecord:true});
     $("manualDialog").close();
     renderSchedule(date);
   } catch (error) {
