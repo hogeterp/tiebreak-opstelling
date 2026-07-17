@@ -1,13 +1,13 @@
 # Wijzigingen
 
-## v1.1.0
-- Zelf indelen volledig vernieuwd.
-- Alle banen kunnen afzonderlijk worden ingevuld voor Tiebreak 1.
-- Alle banen kunnen afzonderlijk worden ingevuld voor Tiebreak 2.
-- Team 1 en Team 2 worden exact opgeslagen zoals gekozen.
-- De app maakt handmatige teams niet meer opnieuw automatisch.
-- Controle op lege plekken.
-- Controle op dubbele spelers per tiebreak.
-- Controle op vergeten spelers per tiebreak.
-- Opslaan kan pas wanneer beide tiebreaks volledig geldig zijn.
-- Automatische indeling en Firebase-basislogica blijven bestaan.
+## v1.1.1
+- Bovenaan heet de app nu Supertiebreak-opstelling.
+- Tiebreak 1 en 2 gewijzigd naar Supertie Ronde 1 en 2.
+- Handmatig gekozen spelers verdwijnen binnen dezelfde ronde uit andere keuzelijsten.
+- Een verwijderde keuze wordt direct opnieuw beschikbaar.
+- Automatische en handmatige indeling lezen verse baaninstellingen uit Firebase.
+- De exacte ingestelde baannummers worden gebruikt.
+- Bij wijziging van het aantal banen worden niet meer automatisch banen 1, 2, 3 enzovoort toegevoegd.
+- Bestaande dubbele of ontbrekende spelernummers worden eenmalig veilig gecorrigeerd.
+- Firebase-speler-ID's blijven ongewijzigd; gekoppelde gegevens blijven behouden.
+- Nieuwe spelers krijgen een nummer boven het hoogste bestaande nummer.

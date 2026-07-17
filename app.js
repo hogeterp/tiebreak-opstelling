@@ -135,11 +135,14 @@ function defaultEveningSettings(date) {
   return { date, courtCount:4, courts:[1,2,3,4], start:"20:00", end:"21:30" };
 }
 
-async function loadEveningSettings(date) {
-  if (state.settings[date]) return state.settings[date];
+async function loadEveningSettings(date, forceFresh=false) {
+  if (state.settings[date] && !forceFresh) return state.settings[date];
   const snap = await getDoc(doc(db, "evenings", date));
-  state.settings[date] = snap.exists() ? { ...defaultEveningSettings(date), ...snap.data() } : defaultEveningSettings(date);
-  return state.settings[date];
+  const loaded = snap.exists() ? { ...defaultEveningSettings(date), ...snap.data() } : defaultEveningSettings(date);
+  loaded.courts = [...new Set((loaded.courts || []).map(Number).filter(n => n >= 1 && n <= 10))].sort((a,b)=>a-b);
+  loaded.courtCount = Number(loaded.courtCount || loaded.courts.length || 4);
+  state.settings[date] = loaded;
+  return loaded;
 }
 
 async function saveEveningSettings(date, settings) {
@@ -455,7 +458,7 @@ async function automaticSchedule(date) {
       return;
     }
 
-    const settings = await loadEveningSettings(date);
+    const settings = await loadEveningSettings(date, true);
     const players = selection.playingIds
       .map(id => state.players.find(p => p.id === id))
       .filter(Boolean);
@@ -531,7 +534,7 @@ function renderSchedule(date) {
       <div class="vs-line">vs</div>
       <div class="match-line team-line">${escapeHtml(teamText(c.team2))}</div>
     </div>`).join("")}</div></div>`;
-  $("scheduleOutput").innerHTML=renderRound("Tiebreak 1",s.round1)+renderRound("Tiebreak 2 — spelers wisselen van baan",s.round2);
+  $("scheduleOutput").innerHTML=renderRound("Supertie Ronde 1",s.round1)+renderRound("Supertie Ronde 2",s.round2);
 }
 
 async function openManualEditor(date) {
@@ -541,7 +544,7 @@ async function openManualEditor(date) {
     return;
   }
 
-  const settings=await loadEveningSettings(date);
+  const settings=await loadEveningSettings(date,true);
   const courtCount=Math.min(settings.courts.length,Math.floor(selection.playingIds.length/4));
   const courts=settings.courts.slice(0,courtCount);
   const playerOptions=selection.playingIds
@@ -554,7 +557,7 @@ async function openManualEditor(date) {
   function roundEditor(roundNumber, roundData) {
     return `
       <section class="manual-round" data-round="${roundNumber}">
-        <h3>Tiebreak ${roundNumber}</h3>
+        <h3>Supertie Ronde ${roundNumber}</h3>
         <div class="manual-round-courts">
           ${courts.map((court,index)=>{
             const existingCourt=(roundData||[]).find(item=>Number(item.court)===Number(court));
@@ -606,11 +609,16 @@ async function openManualEditor(date) {
     ];
     [...card.querySelectorAll("select")].forEach((select,index)=>{
       select.value=values[index];
-      select.addEventListener("change",validateManualEditor);
+      select.addEventListener("change",()=>{
+        updateManualSelectOptions(roundNumber);
+        validateManualEditor();
+      });
     });
   });
 
   $("manualDialog").dataset.date=date;
+  updateManualSelectOptions(1);
+  updateManualSelectOptions(2);
   validateManualEditor();
   $("manualDialog").showModal();
 }
@@ -628,6 +636,26 @@ function readManualRound(roundNumber) {
   });
 }
 
+
+function updateManualSelectOptions(roundNumber) {
+  const roundSelects=[...$("manualEditor").querySelectorAll(`.manual-court[data-round="${roundNumber}"] select`)];
+  const chosen=new Set(roundSelects.map(select=>select.value).filter(Boolean));
+
+  roundSelects.forEach(select=>{
+    const ownValue=select.value;
+    [...select.options].forEach(option=>{
+      if (!option.value) {
+        option.hidden=false;
+        option.disabled=false;
+        return;
+      }
+      const usedElsewhere=chosen.has(option.value) && option.value!==ownValue;
+      option.hidden=usedElsewhere;
+      option.disabled=usedElsewhere;
+    });
+  });
+}
+
 function validateManualEditor() {
   const date=$("manualDialog").dataset.date;
   const selection=state.selections[date];
@@ -641,7 +669,7 @@ function validateManualEditor() {
     const filled=allIds.filter(Boolean);
 
     if (allIds.some(id=>!id)) {
-      problems.push(`Tiebreak ${roundNumber}: nog niet alle plekken zijn ingevuld.`);
+      problems.push(`Supertie Ronde ${roundNumber}: nog niet alle plekken zijn ingevuld.`);
     }
 
     const duplicates=filled.filter((id,index)=>filled.indexOf(id)!==index);
@@ -649,19 +677,19 @@ function validateManualEditor() {
       const duplicateNames=[...new Set(duplicates)]
         .map(id=>displayName(playerById(id)))
         .join(", ");
-      problems.push(`Tiebreak ${roundNumber}: dubbel gekozen: ${duplicateNames}.`);
+      problems.push(`Supertie Ronde ${roundNumber}: dubbel gekozen: ${duplicateNames}.`);
     }
 
     const missing=selectedIds.filter(id=>!filled.includes(id));
     if (missing.length) {
       problems.push(
-        `Tiebreak ${roundNumber}: nog in te delen: ${missing.map(id=>displayName(playerById(id))).join(", ")}.`
+        `Supertie Ronde ${roundNumber}: nog in te delen: ${missing.map(id=>displayName(playerById(id))).join(", ")}.`
       );
     }
 
     const unknown=filled.filter(id=>!selectedSet.has(id));
     if (unknown.length) {
-      problems.push(`Tiebreak ${roundNumber}: bevat een speler buiten de selectie.`);
+      problems.push(`Supertie Ronde ${roundNumber}: bevat een speler buiten de selectie.`);
     }
   });
 
@@ -671,7 +699,7 @@ function validateManualEditor() {
 
   if (valid) {
     status.className="manual-status success";
-    status.innerHTML="Alle spelers zijn in beide tiebreaks precies één keer ingedeeld.";
+    status.innerHTML="Alle spelers zijn in beide supertierondes precies één keer ingedeeld.";
   } else {
     status.className="manual-status error";
     status.innerHTML=problems.map(problem=>`<div>${escapeHtml(problem)}</div>`).join("");
@@ -685,7 +713,7 @@ async function saveManualSchedule() {
   const date=$("manualDialog").dataset.date;
 
   if (!validateManualEditor()) {
-    alert("Maak eerst beide tiebreaks volledig en zonder dubbele spelers.");
+    alert("Maak eerst beide supertierondes volledig en zonder dubbele spelers.");
     return;
   }
 
@@ -758,7 +786,7 @@ async function buildMessage(type,date) {
 
   if (type==="invite") {
     const lines=[
-      "Tiebreak-opstelling","",
+      "Supertiebreak-opstelling","",
       "Beste tennissers,","",
       `${shortDate} spelen we weer!`,"",
       `Tijd: ${timeText}.`,"",
@@ -774,7 +802,7 @@ async function buildMessage(type,date) {
   if (type==="spots") {
     const free=Math.max(0,settings.courtCount*4-counts.yes);
     return [
-      "Tiebreak-opstelling","",
+      "Supertiebreak-opstelling","",
       `Er ${free===1?"is":"zijn"} nog ${free} ${free===1?"plaats":"plaatsen"} beschikbaar voor ${shortDate.toLowerCase()}.`,"",
       "Lijkt het je leuk om mee te spelen? Meld je dan aan via de app.","",
       appText
@@ -783,7 +811,7 @@ async function buildMessage(type,date) {
 
   if (type==="urgent") {
     return [
-      "Tiebreak-opstelling","",
+      "Supertiebreak-opstelling","",
       `Er is onverwacht een plaats vrijgekomen voor ${shortDate.toLowerCase()}.`,"",
       "Kun je meespelen? Laat het zo snel mogelijk weten via de app.","",
       appText
@@ -793,7 +821,7 @@ async function buildMessage(type,date) {
   if (type==="reminder") {
     const names=groupedNames(date,"none");
     const lines=[
-      "Tiebreak-opstelling","",
+      "Supertiebreak-opstelling","",
       "Beste tennissers,","",
       `We missen nog een reactie voor ${shortDate.toLowerCase()}.`
     ];
@@ -805,7 +833,7 @@ async function buildMessage(type,date) {
   if (type==="incomplete") {
     const incomplete=state.players.filter(p=>missingFields(p).length);
     return [
-      "Tiebreak-opstelling","",
+      "Supertiebreak-opstelling","",
       "Wil je je gegevens in de app aanvullen?","",
       ...(incomplete.length?incomplete.map(p=>`- ${displayName(p)}: ${missingFields(p).join(", ")}`):["Alle gegevens zijn compleet."]),
       "",appText
@@ -814,16 +842,16 @@ async function buildMessage(type,date) {
 
   if (type==="final") {
     if (!schedule) return [
-      "Tiebreak-opstelling","",
+      "Supertiebreak-opstelling","",
       `Er is nog geen definitieve indeling gemaakt voor ${shortDate.toLowerCase()}.`
     ].join("\n");
 
     const lines=[
-      "Tiebreak-opstelling","",
+      "Supertiebreak-opstelling","",
       `De indeling voor ${shortDate.toLowerCase()} is bekend.`,"",
       "Veel speelplezier en een fijne tennisavond!",""
     ];
-    [["Tiebreak 1",schedule.round1],["Tiebreak 2",schedule.round2]].forEach(([label,round])=>{
+    [["Supertie Ronde 1",schedule.round1],["Supertie Ronde 2",schedule.round2]].forEach(([label,round])=>{
       lines.push(label);
       round.forEach(c=>lines.push(`Baan ${c.court}: ${teamText(c.team1)} tegen ${teamText(c.team2)}`));
       lines.push("");
@@ -832,7 +860,7 @@ async function buildMessage(type,date) {
     return lines.join("\n");
   }
 
-  return "Tiebreak-opstelling";
+  return "Supertiebreak-opstelling";
 }
 
 async function openMessagePreview(type) {
@@ -848,13 +876,63 @@ function openWhatsApp() {
 }
 
 async function nextPlayerNumber() {
+  const highestExisting=state.players.reduce((highest,p)=>{
+    const number=Number(p.number);
+    return Number.isInteger(number) && number>highest ? number : highest;
+  },0);
+
   const ref=doc(db,"counters","players");
   return await runTransaction(db,async tx=>{
     const snap=await tx.get(ref);
-    const next=(snap.exists()?snap.data().value:0)+1;
-    tx.set(ref,{value:next});
+    const counterValue=snap.exists()?Number(snap.data().value||0):0;
+    const next=Math.max(counterValue,highestExisting)+1;
+    tx.set(ref,{value:next,updatedAt:serverTimestamp()},{merge:true});
     return next;
   });
+}
+
+async function ensureUniquePlayerNumbers(players) {
+  if (state.numberMigrationRunning || !players.length) return false;
+
+  const numbers=players.map(p=>Number(p.number));
+  const valid=numbers.every(n=>Number.isInteger(n)&&n>0);
+  const unique=new Set(numbers).size===numbers.length;
+  if (valid && unique) {
+    const highest=Math.max(...numbers,0);
+    const counterRef=doc(db,"counters","players");
+    const counterSnap=await getDoc(counterRef);
+    const current=counterSnap.exists()?Number(counterSnap.data().value||0):0;
+    if (current<highest) {
+      await setDoc(counterRef,{value:highest,updatedAt:serverTimestamp()},{merge:true});
+    }
+    return false;
+  }
+
+  state.numberMigrationRunning=true;
+  try {
+    const ordered=[...players].sort((a,b)=>{
+      const an=Number.isInteger(Number(a.number))&&Number(a.number)>0?Number(a.number):999999;
+      const bn=Number.isInteger(Number(b.number))&&Number(b.number)>0?Number(b.number):999999;
+      return an-bn || fullName(a).localeCompare(fullName(b),"nl") || a.id.localeCompare(b.id);
+    });
+
+    const batch=writeBatch(db);
+    ordered.forEach((player,index)=>{
+      batch.set(doc(db,"players",player.id),{
+        number:index+1,
+        updatedAt:serverTimestamp()
+      },{merge:true});
+    });
+    batch.set(doc(db,"counters","players"),{
+      value:ordered.length,
+      updatedAt:serverTimestamp()
+    },{merge:true});
+    await batch.commit();
+    await logAction("spelernummers_gecorrigeerd",{count:ordered.length});
+    return true;
+  } finally {
+    state.numberMigrationRunning=false;
+  }
 }
 
 async function savePlayer() {
@@ -1015,10 +1093,17 @@ function attachEvents() {
     const current=await loadEveningSettings(date);
     const count=Number($("courtCount").value);
     current.courtCount=count;
-    current.courts=(current.courts||[]).slice(0,count);
-    for(let n=1;current.courts.length<count&&n<=10;n++)if(!current.courts.includes(n))current.courts.push(n);
+    current.courts=[...new Set((current.courts||[]).map(Number))]
+      .filter(n=>n>=1&&n<=10)
+      .sort((a,b)=>a-b)
+      .slice(0,count);
     await saveEveningSettings(date,current);
     $("maxPlayers").textContent=String(count*4);
+    if(current.courts.length<count){
+      showMessage($("courtMessage"),`Kies nog ${count-current.courts.length} baan${count-current.courts.length===1?"":"en"}.`,"error");
+    }else{
+      hideMessage($("courtMessage"));
+    }
     renderCourtPicker(current);
   };
   $("autoSelection").onclick=()=>automaticSelection($("scheduleDateSelect").value);
@@ -1082,7 +1167,10 @@ async function init() {
   state.dates=getOpenTuesdays();
   attachEvents();
   onSnapshot(collection(db,"players"),async snap=>{
-    state.players=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.number??9999)-(b.number??9999));
+    const loadedPlayers=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const migrated=await ensureUniquePlayerNumbers(loadedPlayers);
+    if (migrated) return;
+    state.players=loadedPlayers.sort((a,b)=>(a.number??9999)-(b.number??9999));
     renderPlayerSelect();
     renderParticipantDates();
     if(state.organizerOpen){renderAdminPlayers();renderOrganizerEvening();renderSchedulePanel();renderStatistics()}
