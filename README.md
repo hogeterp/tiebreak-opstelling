@@ -1,16 +1,13 @@
-# Supertiebreak-opstelling v1.1.2
+# Supertiebreak-opstelling v1.1.3
 
-Nieuwe functies en fixes:
-- Handmatige indelingen worden ook opgeslagen als leergegevens.
-- De leergegevens bevatten spelers, rating, geslacht, teams, tegenstanders, rondes en banen.
-- De gewone indeling blijft daarnaast ongewijzigd opgeslagen.
-- Automatische ronde 2 houdt exact dezelfde baanvolgorde als de ingestelde banen.
+Bugfixes:
+- `settings is not defined` bij handmatig opslaan is opgelost.
+- Handmatige indelingen blijven exact zoals gekozen.
+- Beide rondes worden getoond in de ingestelde baanvolgorde, bijvoorbeeld 2, 8, 9, 10.
+- Automatische indelingen worden ook in die volgorde opgeslagen.
+- De leerrecordfunctie blijft behouden.
 
-De leergegevens worden opgeslagen in Firebase in:
-- collectie: learningSchedules
-- document-ID: datum van de speelavond
-
-Upload naar GitHub:
+Upload:
 - index.html
 - style.css
 - app.js

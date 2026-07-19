@@ -497,10 +497,13 @@ async function automaticSchedule(date) {
       });
     });
 
+    const sortedRound1=sortCourtsByConfiguredOrder(round1,settings.courts);
+    const sortedRound2=sortCourtsByConfiguredOrder(round2,settings.courts);
+
     const schedule = {
       date,
-      round1,
-      round2,
+      round1:sortedRound1,
+      round2:sortedRound2,
       createdAt: new Date().toISOString(),
       mode: "automatic"
     };
@@ -525,16 +528,31 @@ async function automaticSchedule(date) {
 function playerById(id){return state.players.find(p=>p.id===id)}
 function teamText(team){return team.map(id=>displayName(playerById(id))).join(" & ")}
 
-function renderSchedule(date) {
+function sortCourtsByConfiguredOrder(round, configuredCourts) {
+  const order=(configuredCourts||[]).map(Number);
+  return [...(round||[])].sort((a,b)=>{
+    const ai=order.indexOf(Number(a.court));
+    const bi=order.indexOf(Number(b.court));
+    if(ai===-1 && bi===-1) return Number(a.court)-Number(b.court);
+    if(ai===-1) return 1;
+    if(bi===-1) return -1;
+    return ai-bi;
+  });
+}
+
+async function renderSchedule(date) {
   const s=state.schedules[date];
   if (!s) {$("scheduleOutput").innerHTML="<p>Nog geen indeling gemaakt.</p>";return}
+  const settings=await loadEveningSettings(date,true);
+  const round1=sortCourtsByConfiguredOrder(s.round1,settings.courts);
+  const round2=sortCourtsByConfiguredOrder(s.round2,settings.courts);
   const renderRound=(title,round)=>`<div class="round"><h3>${title}</h3><div class="courts-grid">${round.map(c=>`
     <div class="court-card"><strong>Baan ${c.court}</strong>
       <div class="match-line team-line">${escapeHtml(teamText(c.team1))}</div>
       <div class="vs-line">vs</div>
       <div class="match-line team-line">${escapeHtml(teamText(c.team2))}</div>
     </div>`).join("")}</div></div>`;
-  $("scheduleOutput").innerHTML=renderRound("Supertie Ronde 1",s.round1)+renderRound("Supertie Ronde 2",s.round2);
+  $("scheduleOutput").innerHTML=renderRound("Supertie Ronde 1",round1)+renderRound("Supertie Ronde 2",round2);
 }
 
 async function openManualEditor(date) {
@@ -786,9 +804,6 @@ async function saveManualSchedule() {
       team1:[...court.team1],
       team2:[...court.team2]
     }));
-
-    round1.sort((a,b)=>settings.courts.indexOf(Number(a.court))-settings.courts.indexOf(Number(b.court)));
-    round2.sort((a,b)=>settings.courts.indexOf(Number(a.court))-settings.courts.indexOf(Number(b.court)));
 
     const schedule={
       date,
