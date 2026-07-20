@@ -197,3 +197,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   opacity:.45;
   cursor:not-allowed;
 }
+
+.archive-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.archive-row:last-child{border-bottom:0}

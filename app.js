@@ -25,6 +25,7 @@ const state = {
   settings: {},
   selections: {},
   schedules: {},
+  archiveDates: [],
   currentMessage: "",
   pendingImport: [],
   organizerOpen: sessionStorage.getItem("organizerOpen") === "1"
@@ -40,6 +41,21 @@ function localDateKey(date) {
 function parseLocalDate(key) {
   const [y,m,d] = key.split("-").map(Number);
   return new Date(y, m - 1, d, 12, 0, 0);
+}
+
+function getRecentPastTuesday(now = new Date()) {
+  const base = new Date(now);
+  const day = base.getDay();
+  let daysBack = (day - 2 + 7) % 7;
+  if (day === 2 && now.getHours() < 21) daysBack = 7;
+  const recent = new Date(base.getFullYear(), base.getMonth(), base.getDate() - daysBack, 12);
+  return localDateKey(recent);
+}
+
+function organizerDates() {
+  const recent = getRecentPastTuesday();
+  return [...new Set([recent, ...state.dates, ...state.archiveDates])]
+    .sort((a,b)=>b.localeCompare(a));
 }
 
 function getOpenTuesdays(now = new Date()) {
@@ -148,6 +164,7 @@ async function loadEveningSettings(date, forceFresh=false) {
 async function saveEveningSettings(date, settings) {
   state.settings[date] = settings;
   await setDoc(doc(db, "evenings", date), settings, { merge:true });
+  await saveArchiveSnapshot(date);
   await logAction("speelavond_bijgewerkt", { date, courts:settings.courts });
 }
 
@@ -275,15 +292,22 @@ async function setResponse(date, playerId, status, source) {
   await setDoc(doc(db, "playingDates", date, "responses", playerId), {
     playerId, status, source, updatedAt:serverTimestamp()
   });
+  state.responses[date] = state.responses[date] || {};
+  state.responses[date][playerId] = status;
+  await saveArchiveSnapshot(date);
   await logAction("beschikbaarheid_gewijzigd", { date, playerId, status, source });
 }
 
 function fillDateSelects() {
+  const allOrganizerDates = organizerDates();
   ["orgDateSelect","scheduleDateSelect","whatsappDateSelect"].forEach(id => {
     const el = $(id);
     const current = el.value;
-    el.innerHTML = state.dates.map(d => `<option value="${d}">${escapeHtml(capitalize(formatDate(d)))}</option>`).join("");
-    if (state.dates.includes(current)) el.value = current;
+    const dates = id === "orgDateSelect" || id === "scheduleDateSelect" || id === "whatsappDateSelect"
+      ? allOrganizerDates
+      : state.dates;
+    el.innerHTML = dates.map(d => `<option value="${d}">${escapeHtml(capitalize(formatDate(d)))}</option>`).join("");
+    if (dates.includes(current)) el.value = current;
   });
 }
 
@@ -517,6 +541,7 @@ async function automaticSchedule(date) {
     });
 
     state.schedules[date] = schedule;
+    await saveArchiveSnapshot(date);
     await logAction("automatische_indeling", { date });
     renderSchedule(date);
   } catch (error) {
@@ -823,6 +848,7 @@ async function saveManualSchedule() {
     await saveLearningRecord(date,round1,round2);
 
     state.schedules[date]=schedule;
+    await saveArchiveSnapshot(date);
     await logAction("handmatige_indeling",{date,learningRecord:true});
     $("manualDialog").close();
     renderSchedule(date);
@@ -1010,6 +1036,24 @@ async function ensureUniquePlayerNumbers(players) {
   }
 }
 
+async function ensureMemberStatus(players) {
+  const missing = players.filter(p => typeof p.isMember !== "boolean");
+  if (!missing.length || state.memberMigrationRunning) return false;
+  state.memberMigrationRunning = true;
+  try {
+    const batch = writeBatch(db);
+    missing.forEach(player => batch.set(doc(db,"players",player.id), {
+      isMember:true,
+      updatedAt:serverTimestamp()
+    }, {merge:true}));
+    await batch.commit();
+    await logAction("lidstatus_bestaande_spelers_ingesteld", {count:missing.length});
+    return true;
+  } finally {
+    state.memberMigrationRunning = false;
+  }
+}
+
 async function savePlayer() {
   const id=$("editingPlayerId").value;
   const firstName=$("firstName").value.trim();
@@ -1019,7 +1063,8 @@ async function savePlayer() {
   let rating;
   try { rating=parseRating($("rating").value); }
   catch(e){showMessage($("playerFormMessage"),e.message,"error");return}
-  const data={firstName,lastName,gender,rating,updatedAt:serverTimestamp()};
+  const isMember=$("isMember").value !== "no";
+  const data={firstName,lastName,gender,rating,isMember,updatedAt:serverTimestamp()};
   if (id) {
     await setDoc(doc(db,"players",id),data,{merge:true});
     await logAction("speler_gewijzigd",{playerId:id});
@@ -1040,12 +1085,14 @@ function editPlayer(id) {
   $("lastName").value=p.lastName||"";
   $("gender").value=p.gender||"";
   $("rating").value=p.rating===null||p.rating===undefined?"":formatRating(p.rating);
+  $("isMember").value=p.isMember===false?"no":"yes";
   $("cancelEdit").classList.remove("hidden");
   window.scrollTo({top:$("org-manage").offsetTop,behavior:"smooth"});
 }
 
 function resetPlayerForm() {
   ["editingPlayerId","firstName","lastName","gender","rating"].forEach(id=>$(id).value="");
+  $("isMember").value="yes";
   $("cancelEdit").classList.add("hidden");
 }
 
@@ -1059,7 +1106,7 @@ async function removePlayer(id) {
 function renderAdminPlayers() {
   $("playerAdminList").innerHTML=state.players.map(p=>`
     <div class="player-admin-row">
-      <div><strong>nr. ${p.number} · ${escapeHtml(fullName(p))}</strong><div class="player-meta">${p.gender||"geslacht leeg"} · rating ${formatRating(p.rating)}</div></div>
+      <div><strong>nr. ${p.number} · ${escapeHtml(fullName(p))}</strong><div class="player-meta">${p.gender||"geslacht leeg"} · rating ${formatRating(p.rating)} · ${p.isMember===false?"Geen lid":"Lid"}</div></div>
       <div class="actions"><button class="secondary" data-edit="${p.id}">Bewerk</button><button class="danger" data-delete="${p.id}">Verwijder</button></div>
     </div>`).join("")||"<p>Nog geen spelers.</p>";
   document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editPlayer(b.dataset.edit));
@@ -1070,7 +1117,7 @@ function parseDelimitedRows(text) {
   return text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(line=>{
     const delimiter=line.includes(";")?";":",";
     const [firstName="",lastName="",gender="",rating=""]=line.split(delimiter).map(x=>x.trim());
-    return {firstName,lastName,gender:/^vrouw$/i.test(gender)?"Vrouw":/^man$/i.test(gender)?"Man":"",rating};
+    return {firstName,lastName,gender:/^vrouw$/i.test(gender)?"Vrouw":/^man$/i.test(gender)?"Man":"",rating,isMember:true};
   }).filter(r=>r.firstName);
 }
 
@@ -1093,7 +1140,8 @@ async function readImportFile(file) {
     firstName:String(r.Voornaam??r.voornaam??r.FirstName??"").trim(),
     lastName:String(r.Achternaam??r.achternaam??r.LastName??"").trim(),
     gender:String(r.Geslacht??r.geslacht??"").trim(),
-    rating:String(r.Rating??r.rating??r["KNLTB-rating"]??"").trim()
+    rating:String(r.Rating??r.rating??r["KNLTB-rating"]??"").trim(),
+    isMember:!/^nee|no|geen lid$/i.test(String(r.Lid??r.lid??r.Member??"ja").trim())
   })).filter(r=>r.firstName);
   previewImport(normalized);
 }
@@ -1105,7 +1153,7 @@ async function confirmImport() {
     try{rating=parseRating(row.rating)}catch(_){rating=null}
     const number=await nextPlayerNumber();
     const ref=doc(collection(db,"players"));
-    batch.set(ref,{number,firstName:row.firstName,lastName:row.lastName,gender:row.gender==="Man"||row.gender==="Vrouw"?row.gender:"",rating,createdAt:serverTimestamp()});
+    batch.set(ref,{number,firstName:row.firstName,lastName:row.lastName,gender:row.gender==="Man"||row.gender==="Vrouw"?row.gender:"",rating,isMember:row.isMember!==false,createdAt:serverTimestamp()});
   }
   await batch.commit();
   await logAction("spelers_geimporteerd",{count:state.pendingImport.length});
@@ -1120,7 +1168,7 @@ function downloadFile(name,content,type="text/plain") {
 }
 
 function exportCsv() {
-  const rows=[["Nummer","Voornaam","Achternaam","Geslacht","Rating"],...state.players.map(p=>[p.number,p.firstName,p.lastName,p.gender,formatRating(p.rating)])];
+  const rows=[["Nummer","Voornaam","Achternaam","Geslacht","Rating","Lid TV Nieuw-Vennep"],...state.players.map(p=>[p.number,p.firstName,p.lastName,p.gender,formatRating(p.rating),p.isMember===false?"Nee":"Ja"])];
   const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(";")).join("\n");
   downloadFile("tiebreak-spelers.csv","\ufeff"+csv,"text/csv;charset=utf-8");
 }
@@ -1155,6 +1203,65 @@ async function changePin() {
   await setDoc(ref,{pinHash:await sha256(newPin),updatedAt:serverTimestamp()},{merge:true});
   $("oldPin").value="";$("newPin").value="";
   showMessage($("settingsMessage"),"Pincode gewijzigd.","success");
+}
+
+async function saveArchiveSnapshot(date) {
+  const settings = await loadEveningSettings(date, true);
+  const responses = responseMap(date);
+  const selection = state.selections[date] || null;
+  const schedule = state.schedules[date] || null;
+  await setDoc(doc(db,"eveningArchive",date), {
+    date,
+    settingsJson:JSON.stringify(settings),
+    responsesJson:JSON.stringify(responses),
+    selectionJson:JSON.stringify(selection),
+    scheduleJson:JSON.stringify(schedule),
+    updatedAt:serverTimestamp()
+  }, {merge:true});
+  if (!state.archiveDates.includes(date)) state.archiveDates.push(date);
+}
+
+async function loadArchiveData() {
+  const snap = await getDocs(collection(db,"eveningArchive"));
+  const dates = [];
+  snap.forEach(d => {
+    const data = d.data();
+    const date = data.date || d.id;
+    dates.push(date);
+    try { if (data.settingsJson) state.settings[date] = JSON.parse(data.settingsJson); } catch(_) {}
+    try { if (data.responsesJson) state.responses[date] = JSON.parse(data.responsesJson); } catch(_) {}
+    try { if (data.selectionJson) state.selections[date] = JSON.parse(data.selectionJson); } catch(_) {}
+    try { if (data.scheduleJson) state.schedules[date] = JSON.parse(data.scheduleJson); } catch(_) {}
+  });
+  state.archiveDates = [...new Set(dates)].sort((a,b)=>b.localeCompare(a));
+  renderArchive();
+}
+
+function renderArchive() {
+  const el = $("archiveList");
+  if (!el) return;
+  const dates = state.archiveDates.filter(d => d < state.dates[0]).sort((a,b)=>b.localeCompare(a));
+  if (!dates.length) {
+    el.innerHTML = "<p>Nog geen opgeslagen speelavonden.</p>";
+    return;
+  }
+  el.innerHTML = dates.map(date => {
+    const schedule = state.schedules[date];
+    const selection = state.selections[date];
+    const count = selection?.playingIds?.length || 0;
+    return `<div class="archive-row">
+      <div><strong>${escapeHtml(capitalize(formatDate(date)))}</strong><div class="player-meta">${count} spelers · ${schedule?.mode==="manual"?"handmatig":schedule?"automatisch":"geen indeling"}</div></div>
+      <button type="button" class="secondary" data-archive-date="${date}">Bekijken</button>
+    </div>`;
+  }).join("");
+  el.querySelectorAll("[data-archive-date]").forEach(btn => btn.addEventListener("click", () => {
+    const date = btn.dataset.archiveDate;
+    switchOrg("schedule");
+    fillDateSelects();
+    $("scheduleDateSelect").value = date;
+    renderSelectionSummary(date);
+    renderSchedule(date);
+  }));
 }
 
 function attachEvents() {
@@ -1241,14 +1348,17 @@ function subscribeResponses() {
 async function init() {
   state.dates=getOpenTuesdays();
   attachEvents();
+  await loadArchiveData();
   onSnapshot(collection(db,"players"),async snap=>{
     const loadedPlayers=snap.docs.map(d=>({id:d.id,...d.data()}));
     const migrated=await ensureUniquePlayerNumbers(loadedPlayers);
     if (migrated) return;
+    const memberMigrated=await ensureMemberStatus(loadedPlayers);
+    if (memberMigrated) return;
     state.players=loadedPlayers.sort((a,b)=>(a.number??9999)-(b.number??9999));
     renderPlayerSelect();
     renderParticipantDates();
-    if(state.organizerOpen){renderAdminPlayers();renderOrganizerEvening();renderSchedulePanel();renderStatistics()}
+    if(state.organizerOpen){renderAdminPlayers();renderOrganizerEvening();renderSchedulePanel();renderStatistics();renderArchive()}
   });
   await loadExistingDocs();
   subscribeResponses();
