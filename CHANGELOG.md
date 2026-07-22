@@ -30,3 +30,11 @@
 - Overgeslagen dinsdagen verschijnen niet bij de eerstvolgende twee speelavonden.
 - `vs` is vervangen door een streepje tussen de teams.
 - ROADMAP.md toegevoegd.
+
+## v2.0.0 - stap 4
+
+- Indelingskwaliteit van 0 tot 100 toegevoegd.
+- Deelresultaten voor ratingbalans, mixdubbels, nieuwe partners, nieuwe tegenstanders, nieuwe viertallen en dubbele koppels toegevoegd.
+- De app toont hoeveel geldige indelingen zijn onderzocht.
+- Organisator kan de wegingsfactoren van het automatische algoritme instellen.
+- Standaardwaarden kunnen met één knop worden teruggezet.

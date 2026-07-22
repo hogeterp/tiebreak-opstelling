@@ -11,9 +11,13 @@
 - [x] Automatische indeling met historische puntenscore
 - [x] Geen gelijk koppel in ronde 1 en ronde 2 bij automatisch indelen
 - [x] Dezelfde vier spelers automatisch zo veel mogelijk vermijden
+- [x] Indelingskwaliteit van 0 tot 100
+- [x] Uitleg per onderdeel van de kwaliteitsscore
+- [x] Aantal onderzochte geldige indelingen tonen
+- [x] Wegingen door organisator instelbaar
 - [ ] Praktijktest door Carel
 
-## Later
+## Na praktijktest
 
-- [ ] Weging van de puntenscore eventueel instelbaar maken
-- [ ] Verbeteringen op basis van praktijktesten
+- [ ] Wegingen verfijnen op basis van echte speelavonden
+- [ ] Eventuele fouten en verbeterpunten verwerken in v2.0.1

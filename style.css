@@ -221,3 +221,20 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 }
 .stats-summary span{font-size:.78rem;color:var(--gray);text-align:right}
 .stats-table th:nth-child(n+2),.stats-table td:nth-child(n+2){text-align:center}
+
+.quality-card{
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:12px;
+  margin-bottom:12px;
+  background:#fff;
+}
+.quality-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}
+.quality-head strong{display:block;color:var(--green);font-size:1rem}
+.quality-head span{display:block;color:var(--gray);font-size:.75rem;margin-top:2px}
+.quality-score{font-size:1.45rem;font-weight:800;white-space:nowrap}
+.quality-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.quality-grid span{display:flex;justify-content:space-between;gap:8px;padding:7px 8px;border-radius:8px;background:#f6f7f7;font-size:.78rem}
+.quality-grid b{white-space:nowrap}
+.score-weight-grid{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}
+@media(max-width:520px){.quality-grid{grid-template-columns:1fr}.quality-score{font-size:1.2rem}}

@@ -17,6 +17,8 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const APP_URL = "https://hogeterp.github.io/tiebreak-opstelling/";
 
+const DEFAULT_SCORE_WEIGHTS = { rating:40, spread:2, mix:20, partner:20, opponent:6, four:10 };
+
 const $ = id => document.getElementById(id);
 const state = {
   players: [],
@@ -27,6 +29,7 @@ const state = {
   schedules: {},
   archiveDates: [],
   skippedDates: [],
+  scoreWeights: {...DEFAULT_SCORE_WEIGHTS},
   currentMessage: "",
   pendingImport: [],
   organizerOpen: sessionStorage.getItem("organizerOpen") === "1"
@@ -480,7 +483,7 @@ function isMixedTeam(team) {
   return genders.includes("Man") && genders.includes("Vrouw");
 }
 
-function scoreMatch(pairing, history, previousPairKeys=new Set(), previousFourKeys=new Set()) {
+function scoreMatch(pairing, history, previousPairKeys=new Set(), previousFourKeys=new Set(), weights=state.scoreWeights) {
   const ids1=pairing.team1.map(p=>p.id);
   const ids2=pairing.team2.map(p=>p.id);
   const allIds=[...ids1,...ids2];
@@ -489,23 +492,23 @@ function scoreMatch(pairing, history, previousPairKeys=new Set(), previousFourKe
   const ratings=[...pairing.team1,...pairing.team2].map(p=>Number(p.rating??9));
 
   let score=0;
-  score += Math.abs(avg1-avg2)*40;                         // zo gelijk mogelijke teams
-  score += (Math.max(...ratings)-Math.min(...ratings))*2; // geen extreem brede baan
+  score += Math.abs(avg1-avg2)*Number(weights.rating||40);                         // zo gelijk mogelijke teams
+  score += (Math.max(...ratings)-Math.min(...ratings))*Number(weights.spread||2); // geen extreem brede baan
 
   const women=allIds.map(id=>playerById(id)?.gender).filter(g=>g==="Vrouw").length;
-  if(women===2 && isMixedTeam(pairing.team1) && isMixedTeam(pairing.team2)) score-=20;
-  else if(women===2) score+=12;
+  if(women===2 && isMixedTeam(pairing.team1) && isMixedTeam(pairing.team2)) score-=Number(weights.mix||20);
+  else if(women===2) score+=Number(weights.mix||20)*0.6;
 
   const pair1=pairKey(ids1[0],ids1[1]);
   const pair2=pairKey(ids2[0],ids2[1]);
-  score += (history.partnerCounts.get(pair1)||0)*20;
-  score += (history.partnerCounts.get(pair2)||0)*20;
+  score += (history.partnerCounts.get(pair1)||0)*Number(weights.partner||20);
+  score += (history.partnerCounts.get(pair2)||0)*Number(weights.partner||20);
 
   ids1.forEach(a=>ids2.forEach(b=>{
-    score += (history.opponentCounts.get(pairKey(a,b))||0)*6;
+    score += (history.opponentCounts.get(pairKey(a,b))||0)*Number(weights.opponent||6);
   }));
 
-  score += (history.fourCounts.get(fourKey(allIds))||0)*10;
+  score += (history.fourCounts.get(fourKey(allIds))||0)*Number(weights.four||10);
 
   // Harde regel: hetzelfde koppel mag niet in beide rondes voorkomen.
   if(previousPairKeys.has(pair1) || previousPairKeys.has(pair2)) score+=100000;
@@ -527,7 +530,7 @@ function roundKeys(round) {
   return {pairKeys,fourKeys};
 }
 
-function makeRoundCandidate(players, courts, history, previousRound=null) {
+function makeRoundCandidate(players, courts, history, previousRound=null, weights=state.scoreWeights) {
   const shuffled=shuffleCopy(players);
   const previous=previousRound ? roundKeys(previousRound) : {pairKeys:new Set(),fourKeys:new Set()};
   const round=[];
@@ -538,7 +541,7 @@ function makeRoundCandidate(players, courts, history, previousRound=null) {
     if(group.length<4) return null;
     let best=null;
     allPairings(group).forEach(pairing=>{
-      const pairingScore=scoreMatch(pairing,history,previous.pairKeys,previous.fourKeys);
+      const pairingScore=scoreMatch(pairing,history,previous.pairKeys,previous.fourKeys,weights);
       if(!best || pairingScore<best.score) best={pairing,score:pairingScore};
     });
     score+=best.score;
@@ -557,22 +560,55 @@ function hasDuplicatePairAcrossRounds(round1,round2) {
   return [...roundKeys(round2).pairKeys].some(key=>first.has(key));
 }
 
-function createSmartSchedule(players,courts,history) {
+function createSmartSchedule(players,courts,history,weights=state.scoreWeights) {
   let best=null;
+  let examined=0;
   const iterations=Math.max(1800,players.length*220);
 
   for(let i=0;i<iterations;i++){
-    const first=makeRoundCandidate(players,courts,history);
+    const first=makeRoundCandidate(players,courts,history,null,weights);
     if(!first) continue;
-    const second=makeRoundCandidate(players,courts,history,first.round);
+    const second=makeRoundCandidate(players,courts,history,first.round,weights);
     if(!second || hasDuplicatePairAcrossRounds(first.round,second.round)) continue;
+    examined++;
 
     const total=first.score+second.score;
     if(!best || total<best.score) best={round1:first.round,round2:second.round,score:total};
   }
 
   if(!best) throw new Error("Er kon geen indeling worden gevonden zonder hetzelfde koppel in beide rondes.");
+  best.examined=examined;
+  best.quality=evaluateScheduleQuality(best.round1,best.round2,history);
   return best;
+}
+
+function clampScore(value){ return Math.max(0,Math.min(100,Math.round(value))); }
+
+function evaluateScheduleQuality(round1,round2,history){
+  const courts=[...(round1||[]),...(round2||[])];
+  if(!courts.length) return null;
+  let ratingTotal=0,mixPossible=0,mixGood=0,partnerRepeats=0,opponentRepeats=0,fourRepeats=0;
+  courts.forEach(c=>{
+    const t1=(c.team1||[]).map(playerById).filter(Boolean);
+    const t2=(c.team2||[]).map(playerById).filter(Boolean);
+    if(t1.length!==2||t2.length!==2)return;
+    const avg1=t1.reduce((a,p)=>a+Number(p.rating??9),0)/2;
+    const avg2=t2.reduce((a,p)=>a+Number(p.rating??9),0)/2;
+    ratingTotal+=Math.abs(avg1-avg2);
+    const all=[...t1,...t2];
+    if(all.filter(p=>p.gender==="Vrouw").length===2){ mixPossible++; if(isMixedTeam(t1)&&isMixedTeam(t2))mixGood++; }
+    partnerRepeats+=(history.partnerCounts.get(pairKey(t1[0].id,t1[1].id))||0)+(history.partnerCounts.get(pairKey(t2[0].id,t2[1].id))||0);
+    t1.forEach(a=>t2.forEach(b=>opponentRepeats+=(history.opponentCounts.get(pairKey(a.id,b.id))||0)));
+    fourRepeats+=(history.fourCounts.get(fourKey(all.map(p=>p.id)))||0);
+  });
+  const rating=clampScore(100-(ratingTotal/courts.length)*22);
+  const mix=mixPossible?clampScore((mixGood/mixPossible)*100):100;
+  const partners=clampScore(100-partnerRepeats*9);
+  const opponents=clampScore(100-opponentRepeats*2.5);
+  const groups=clampScore(100-fourRepeats*12);
+  const duplicatePairs=hasDuplicatePairAcrossRounds(round1,round2)?0:100;
+  const total=clampScore(rating*.35+mix*.15+partners*.22+opponents*.15+groups*.08+duplicatePairs*.05);
+  return {total,rating,mix,partners,opponents,groups,duplicatePairs};
 }
 
 async function automaticSchedule(date) {
@@ -603,7 +639,7 @@ async function automaticSchedule(date) {
 
     const courts=availableCourts.slice(0,groupCount);
     const history=buildHistory("all",date);
-    const smart=createSmartSchedule(scheduledPlayers,courts,history);
+    const smart=createSmartSchedule(scheduledPlayers,courts,history,state.scoreWeights);
     const sortedRound1=sortCourtsByConfiguredOrder(smart.round1,settings.courts);
     const sortedRound2=sortCourtsByConfiguredOrder(smart.round2,settings.courts);
 
@@ -614,7 +650,10 @@ async function automaticSchedule(date) {
       createdAt:new Date().toISOString(),
       mode:"automatic",
       algorithm:"historical-score-v2",
-      score:Math.round(smart.score*10)/10
+      score:Math.round(smart.score*10)/10,
+      examined:smart.examined,
+      quality:smart.quality,
+      weights:{...state.scoreWeights}
     };
 
     await setDoc(doc(db,"schedules",date),{
@@ -623,6 +662,7 @@ async function automaticSchedule(date) {
       mode:"automatic",
       algorithm:"historical-score-v2",
       score:schedule.score,
+      examined:schedule.examined,
       updatedAt:serverTimestamp()
     });
 
@@ -706,7 +746,9 @@ async function renderSchedule(date) {
       <div class="vs-line">-</div>
       <div class="match-line team-line">${escapeHtml(teamText(c.team2))}</div>
     </div>`).join("")}</div></div>`;
-  $("scheduleOutput").innerHTML=renderRound("Supertie Ronde 1",round1)+renderRound("Supertie Ronde 2",round2);
+  const quality=s.quality || (s.mode==="automatic"?evaluateScheduleQuality(round1,round2,buildHistory("all",date)):null);
+  const qualityHtml=quality?`<div class="quality-card"><div class="quality-head"><div><strong>Indelingskwaliteit</strong><span>${s.examined?`Beste uit ${Number(s.examined).toLocaleString("nl-NL")} onderzochte indelingen`:"Beoordeling van deze indeling"}</span></div><div class="quality-score">${quality.total}/100</div></div><div class="quality-grid"><span>Ratingbalans <b>${quality.rating}%</b></span><span>Mixdubbels <b>${quality.mix}%</b></span><span>Nieuwe partners <b>${quality.partners}%</b></span><span>Nieuwe tegenstanders <b>${quality.opponents}%</b></span><span>Nieuwe viertallen <b>${quality.groups}%</b></span><span>Geen dubbel koppel <b>${quality.duplicatePairs}%</b></span></div></div>`:"";
+  $("scheduleOutput").innerHTML=qualityHtml+renderRound("Supertie Ronde 1",round1)+renderRound("Supertie Ronde 2",round2);
 }
 
 async function openManualEditor(date) {
@@ -1364,6 +1406,34 @@ function renderStatistics() {
 }
 
 
+async function loadScoreWeights(){
+  const snap=await getDoc(doc(db,"settings","scoreWeights"));
+  state.scoreWeights={...DEFAULT_SCORE_WEIGHTS,...(snap.exists()?snap.data():{})};
+  renderScoreWeights();
+}
+
+function renderScoreWeights(){
+  Object.keys(DEFAULT_SCORE_WEIGHTS).forEach(key=>{const el=$("weight_"+key);if(el)el.value=String(state.scoreWeights[key]);});
+}
+
+async function saveScoreWeights(){
+  const next={};
+  for(const key of Object.keys(DEFAULT_SCORE_WEIGHTS)){
+    const value=Number($("weight_"+key)?.value);
+    if(!Number.isFinite(value)||value<0||value>100){showMessage($("scoreWeightsMessage"),"Gebruik waarden tussen 0 en 100.","error");return;}
+    next[key]=value;
+  }
+  state.scoreWeights=next;
+  await setDoc(doc(db,"settings","scoreWeights"),{...next,updatedAt:serverTimestamp()},{merge:true});
+  showMessage($("scoreWeightsMessage"),"Wegingen opgeslagen. Ze worden gebruikt bij de volgende automatische indeling.","success");
+}
+
+function resetScoreWeights(){
+  state.scoreWeights={...DEFAULT_SCORE_WEIGHTS};
+  renderScoreWeights();
+  showMessage($("scoreWeightsMessage"),"Standaardwaarden ingevuld. Druk op Opslaan om ze te bewaren.","success");
+}
+
 async function changePin() {
   const oldPin=$("oldPin").value.trim(),newPin=$("newPin").value.trim();
   if(!/^\d{4}$/.test(oldPin)||!/^\d{4}$/.test(newPin)){showMessage($("settingsMessage"),"Gebruik twee pincodes van vier cijfers.","error");return}
@@ -1508,6 +1578,8 @@ function attachEvents() {
   $("statisticsPeriod").onchange=renderStatistics;
   $("statisticsPlayer").onchange=renderStatistics;
   $("changePin").onclick=changePin;
+  $("saveScoreWeights").onclick=saveScoreWeights;
+  $("resetScoreWeights").onclick=resetScoreWeights;
   $("addNoPlayDate").onclick=addSkippedDate;
   $("logoutOrganizer").onclick=()=>{state.organizerOpen=false;sessionStorage.removeItem("organizerOpen");switchMain("participant")};
 }
@@ -1552,6 +1624,7 @@ function subscribeResponses() {
 
 async function init() {
   await loadSkippedDates();
+    await loadScoreWeights();
   state.dates=getOpenTuesdays();
   attachEvents();
   renderSkippedDates();
