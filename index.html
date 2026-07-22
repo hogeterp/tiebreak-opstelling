@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#147a3e">
   <title>Supertiebreak-opstelling</title>
-  <link rel="stylesheet" href="style.css?v=1.1.4">
+  <link rel="stylesheet" href="style.css?v=2.0.0">
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -18,7 +18,7 @@
   </a>
   <header class="topbar">
     <div>
-      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v1.1.4</span></div>
+      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.0.0</span></div>
       <p>Dinsdag 20:00–21:30</p>
     </div>
   </header>
@@ -149,7 +149,7 @@
                 <select id="gender"><option value=""></option><option>Man</option><option>Vrouw</option></select>
               </div>
               <div><label for="rating">KNLTB-rating</label><input id="rating" type="text" inputmode="decimal" placeholder="bijv. 6,4"></div>
-              <div><label for="isMember">Lid van TV Nieuw-Vennep?</label><select id="isMember"><option value="yes">Ja</option><option value="no">Nee</option></select></div>
+              <div><label for="membershipType">Lidmaatschap</label><select id="membershipType"><option value="member" selected>Lid</option><option value="morning">Ochtendlid</option><option value="competition">Competitielid</option><option value="none">Geen lid</option></select></div>
             </div>
             <input id="editingPlayerId" type="hidden">
             <div class="action-row">
@@ -176,6 +176,18 @@
             </div>
           </details>
 
+
+          <details class="card">
+            <summary>Geen Supertie-speeldagen</summary>
+            <p>Kies een dinsdag waarop niet wordt gespeeld.</p>
+            <div class="field-grid">
+              <div><label for="noPlayDate">Dinsdag</label><input id="noPlayDate" type="date"></div>
+              <div class="action-row align-end"><button id="addNoPlayDate" type="button">Toevoegen</button></div>
+            </div>
+            <div id="noPlayMessage" class="message hidden"></div>
+            <div id="noPlayDatesList"></div>
+          </details>
+
           <details class="card">
             <summary>Speelavondenarchief</summary>
             <p>Opgeslagen speelavonden blijven hier bewaard.</p>
@@ -188,12 +200,13 @@
           </details>
 
           <details class="card">
-            <summary>Nieuw in v1.1.4</summary>
+            <summary>Nieuw in v2.0.0</summary>
             <ul>
               <li>Speelavonden worden opgeslagen in een archief.</li>
               <li>De laatste speelavond blijft nog 7 dagen beschikbaar voor de organisator.</li>
-              <li>Bij iedere speler kan worden aangegeven of die lid is van TV Nieuw-Vennep.</li>
-              <li>Bestaande spelers worden automatisch als lid ingesteld.</li>
+              <li>Lidmaatschap: Lid, Ochtendlid, Competitielid of Geen lid.</li>
+              <li>De organisator kan Geen Supertie-speeldagen instellen.</li>
+              <li>In de opstelling staat een streepje tussen de teams.</li>
             </ul>
           </details>
 
@@ -250,6 +263,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="app.js?v=1.1.4"></script>
+  <script type="module" src="app.js?v=2.0.0"></script>
 </body>
 </html>

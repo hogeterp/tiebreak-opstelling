@@ -26,6 +26,7 @@ const state = {
   selections: {},
   schedules: {},
   archiveDates: [],
+  skippedDates: [],
   currentMessage: "",
   pendingImport: [],
   organizerOpen: sessionStorage.getItem("organizerOpen") === "1"
@@ -63,9 +64,14 @@ function getOpenTuesdays(now = new Date()) {
   const day = base.getDay();
   let daysToTuesday = (2 - day + 7) % 7;
   if (day === 2 && now.getHours() >= 21) daysToTuesday = 7;
-  const first = new Date(base.getFullYear(), base.getMonth(), base.getDate() + daysToTuesday, 12);
-  const second = new Date(first.getFullYear(), first.getMonth(), first.getDate() + 7, 12);
-  return [localDateKey(first), localDateKey(second)];
+  const result = [];
+  let cursor = new Date(base.getFullYear(), base.getMonth(), base.getDate() + daysToTuesday, 12);
+  while (result.length < 2) {
+    const key = localDateKey(cursor);
+    if (!state.skippedDates.includes(key)) result.push(key);
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7, 12);
+  }
+  return result;
 }
 
 function formatDate(key) {
@@ -80,6 +86,18 @@ function capitalize(text) {
 
 function fullName(p) {
   return `${p.firstName || ""} ${p.lastName || ""}`.trim();
+}
+
+function membershipLabel(value) {
+  return ({member:"Lid", morning:"Ochtendlid", competition:"Competitielid", none:"Geen lid"})[value] || "Lid";
+}
+
+function normalizeMembership(value) {
+  const text=String(value||"").trim().toLowerCase();
+  if (/ochtend|daglid/.test(text)) return "morning";
+  if (/competitie/.test(text)) return "competition";
+  if (/geen|nee|no|gast|introduc/.test(text)) return "none";
+  return "member";
 }
 
 function displayName(p) {
@@ -574,7 +592,7 @@ async function renderSchedule(date) {
   const renderRound=(title,round)=>`<div class="round"><h3>${title}</h3><div class="courts-grid">${round.map(c=>`
     <div class="court-card"><strong>Baan ${c.court}</strong>
       <div class="match-line team-line">${escapeHtml(teamText(c.team1))}</div>
-      <div class="vs-line">vs</div>
+      <div class="vs-line">-</div>
       <div class="match-line team-line">${escapeHtml(teamText(c.team2))}</div>
     </div>`).join("")}</div></div>`;
   $("scheduleOutput").innerHTML=renderRound("Supertie Ronde 1",round1)+renderRound("Supertie Ronde 2",round2);
@@ -620,7 +638,7 @@ async function openManualEditor(date) {
                   </div>
                 </div>
 
-                <div class="vs-line manual-vs">vs</div>
+                <div class="vs-line manual-vs">-</div>
 
                 <div class="manual-team">
                   <span class="manual-team-label">Team 2</span>
@@ -1037,13 +1055,13 @@ async function ensureUniquePlayerNumbers(players) {
 }
 
 async function ensureMemberStatus(players) {
-  const missing = players.filter(p => typeof p.isMember !== "boolean");
+  const missing = players.filter(p => !p.membershipType);
   if (!missing.length || state.memberMigrationRunning) return false;
   state.memberMigrationRunning = true;
   try {
     const batch = writeBatch(db);
     missing.forEach(player => batch.set(doc(db,"players",player.id), {
-      isMember:true,
+      membershipType:"member",
       updatedAt:serverTimestamp()
     }, {merge:true}));
     await batch.commit();
@@ -1063,8 +1081,8 @@ async function savePlayer() {
   let rating;
   try { rating=parseRating($("rating").value); }
   catch(e){showMessage($("playerFormMessage"),e.message,"error");return}
-  const isMember=$("isMember").value !== "no";
-  const data={firstName,lastName,gender,rating,isMember,updatedAt:serverTimestamp()};
+  const membershipType=$("membershipType").value || "member";
+  const data={firstName,lastName,gender,rating,membershipType,updatedAt:serverTimestamp()};
   if (id) {
     await setDoc(doc(db,"players",id),data,{merge:true});
     await logAction("speler_gewijzigd",{playerId:id});
@@ -1085,14 +1103,14 @@ function editPlayer(id) {
   $("lastName").value=p.lastName||"";
   $("gender").value=p.gender||"";
   $("rating").value=p.rating===null||p.rating===undefined?"":formatRating(p.rating);
-  $("isMember").value=p.isMember===false?"no":"yes";
+  $("membershipType").value=p.membershipType||"member";
   $("cancelEdit").classList.remove("hidden");
   window.scrollTo({top:$("org-manage").offsetTop,behavior:"smooth"});
 }
 
 function resetPlayerForm() {
   ["editingPlayerId","firstName","lastName","gender","rating"].forEach(id=>$(id).value="");
-  $("isMember").value="yes";
+  $("membershipType").value="member";
   $("cancelEdit").classList.add("hidden");
 }
 
@@ -1106,7 +1124,7 @@ async function removePlayer(id) {
 function renderAdminPlayers() {
   $("playerAdminList").innerHTML=state.players.map(p=>`
     <div class="player-admin-row">
-      <div><strong>nr. ${p.number} · ${escapeHtml(fullName(p))}</strong><div class="player-meta">${p.gender||"geslacht leeg"} · rating ${formatRating(p.rating)} · ${p.isMember===false?"Geen lid":"Lid"}</div></div>
+      <div><strong>nr. ${p.number} · ${escapeHtml(fullName(p))}</strong><div class="player-meta">${p.gender||"geslacht leeg"} · rating ${formatRating(p.rating)} · ${membershipLabel(p.membershipType)}</div></div>
       <div class="actions"><button class="secondary" data-edit="${p.id}">Bewerk</button><button class="danger" data-delete="${p.id}">Verwijder</button></div>
     </div>`).join("")||"<p>Nog geen spelers.</p>";
   document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editPlayer(b.dataset.edit));
@@ -1117,7 +1135,7 @@ function parseDelimitedRows(text) {
   return text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean).map(line=>{
     const delimiter=line.includes(";")?";":",";
     const [firstName="",lastName="",gender="",rating=""]=line.split(delimiter).map(x=>x.trim());
-    return {firstName,lastName,gender:/^vrouw$/i.test(gender)?"Vrouw":/^man$/i.test(gender)?"Man":"",rating,isMember:true};
+    return {firstName,lastName,gender:/^vrouw$/i.test(gender)?"Vrouw":/^man$/i.test(gender)?"Man":"",rating,membershipType:"member"};
   }).filter(r=>r.firstName);
 }
 
@@ -1141,7 +1159,7 @@ async function readImportFile(file) {
     lastName:String(r.Achternaam??r.achternaam??r.LastName??"").trim(),
     gender:String(r.Geslacht??r.geslacht??"").trim(),
     rating:String(r.Rating??r.rating??r["KNLTB-rating"]??"").trim(),
-    isMember:!/^nee|no|geen lid$/i.test(String(r.Lid??r.lid??r.Member??"ja").trim())
+    membershipType:normalizeMembership(String(r.Lidmaatschap??r.lidmaatschap??r.Lid??r.lid??r.Member??"lid").trim())
   })).filter(r=>r.firstName);
   previewImport(normalized);
 }
@@ -1153,7 +1171,7 @@ async function confirmImport() {
     try{rating=parseRating(row.rating)}catch(_){rating=null}
     const number=await nextPlayerNumber();
     const ref=doc(collection(db,"players"));
-    batch.set(ref,{number,firstName:row.firstName,lastName:row.lastName,gender:row.gender==="Man"||row.gender==="Vrouw"?row.gender:"",rating,isMember:row.isMember!==false,createdAt:serverTimestamp()});
+    batch.set(ref,{number,firstName:row.firstName,lastName:row.lastName,gender:row.gender==="Man"||row.gender==="Vrouw"?row.gender:"",rating,membershipType:row.membershipType||"member",createdAt:serverTimestamp()});
   }
   await batch.commit();
   await logAction("spelers_geimporteerd",{count:state.pendingImport.length});
@@ -1168,7 +1186,7 @@ function downloadFile(name,content,type="text/plain") {
 }
 
 function exportCsv() {
-  const rows=[["Nummer","Voornaam","Achternaam","Geslacht","Rating","Lid TV Nieuw-Vennep"],...state.players.map(p=>[p.number,p.firstName,p.lastName,p.gender,formatRating(p.rating),p.isMember===false?"Nee":"Ja"])];
+  const rows=[["Nummer","Voornaam","Achternaam","Geslacht","Rating","Lidmaatschap"],...state.players.map(p=>[p.number,p.firstName,p.lastName,p.gender,formatRating(p.rating),membershipLabel(p.membershipType)])];
   const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(";")).join("\n");
   downloadFile("tiebreak-spelers.csv","\ufeff"+csv,"text/csv;charset=utf-8");
 }
@@ -1264,6 +1282,39 @@ function renderArchive() {
   }));
 }
 
+async function loadSkippedDates() {
+  const snap=await getDoc(doc(db,"settings","noPlayDates"));
+  state.skippedDates=snap.exists() && Array.isArray(snap.data().dates) ? [...new Set(snap.data().dates)].sort() : [];
+}
+
+function renderSkippedDates() {
+  const el=$("noPlayDatesList");
+  if(!el) return;
+  if(!state.skippedDates.length){el.innerHTML="<p>Nog geen datums overgeslagen.</p>";return;}
+  el.innerHTML=state.skippedDates.map(date=>`<div class="archive-row"><div><strong>${escapeHtml(capitalize(formatDate(date)))}</strong><div class="player-meta">Geen Supertie-speeldag</div></div><button type="button" class="danger" data-remove-no-play="${date}">Verwijderen</button></div>`).join("");
+  el.querySelectorAll("[data-remove-no-play]").forEach(btn=>btn.onclick=()=>removeSkippedDate(btn.dataset.removeNoPlay));
+}
+
+async function addSkippedDate() {
+  const date=$("noPlayDate").value;
+  if(!date){showMessage($("noPlayMessage"),"Kies eerst een datum.","error");return;}
+  if(parseLocalDate(date).getDay()!==2){showMessage($("noPlayMessage"),"Kies een dinsdag.","error");return;}
+  state.skippedDates=[...new Set([...state.skippedDates,date])].sort();
+  await setDoc(doc(db,"settings","noPlayDates"),{dates:state.skippedDates,updatedAt:serverTimestamp()},{merge:true});
+  state.dates=getOpenTuesdays();
+  await loadExistingDocs();
+  fillDateSelects();renderParticipantDates();renderSkippedDates();
+  showMessage($("noPlayMessage"),"Geen Supertie-speeldag opgeslagen.","success");
+}
+
+async function removeSkippedDate(date) {
+  state.skippedDates=state.skippedDates.filter(d=>d!==date);
+  await setDoc(doc(db,"settings","noPlayDates"),{dates:state.skippedDates,updatedAt:serverTimestamp()},{merge:true});
+  state.dates=getOpenTuesdays();
+  await loadExistingDocs();
+  fillDateSelects();renderParticipantDates();renderSkippedDates();
+}
+
 function attachEvents() {
   bindMainNavigation();
   $("pinSubmit").onclick=submitPin;
@@ -1304,6 +1355,7 @@ function attachEvents() {
   $("exportCsv").onclick=exportCsv;
   $("exportBackup").onclick=exportBackup;
   $("changePin").onclick=changePin;
+  $("addNoPlayDate").onclick=addSkippedDate;
   $("logoutOrganizer").onclick=()=>{state.organizerOpen=false;sessionStorage.removeItem("organizerOpen");switchMain("participant")};
 }
 
@@ -1346,8 +1398,10 @@ function subscribeResponses() {
 }
 
 async function init() {
+  await loadSkippedDates();
   state.dates=getOpenTuesdays();
   attachEvents();
+  renderSkippedDates();
   await loadArchiveData();
   onSnapshot(collection(db,"players"),async snap=>{
     const loadedPlayers=snap.docs.map(d=>({id:d.id,...d.data()}));

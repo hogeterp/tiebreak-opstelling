@@ -1,15 +1,19 @@
-# Supertiebreak-opstelling v1.1.4
+# Supertiebreak-opstelling v2.0.0
 
-Nieuwe functies:
-- Speelavonden worden opgeslagen in Firebase in `eveningArchive`.
-- Oude speelavonden zijn terug te kijken via Beheer > Speelavondenarchief.
-- De meest recente afgelopen dinsdag blijft in de datumkeuzes van de organisator beschikbaar.
-- Spelers hebben een veld `Lid van TV Nieuw-Vennep` (Ja/Nee).
-- Bestaande spelers zonder lidstatus worden automatisch als lid ingesteld.
-- Lidstatus wordt weergegeven in spelersbeheer en meegenomen in CSV-export en back-up.
+Werkversie van v2.0.
+
+In deze stap toegevoegd:
+- vier soorten lidmaatschap;
+- Lid als standaard;
+- Geen Supertie-speeldagen;
+- streepje tussen de teams;
+- ROADMAP.md met de resterende v2.0-functies.
 
 Upload naar GitHub:
 - index.html
 - style.css
 - app.js
 - club-logo.png
+- README.md
+- CHANGELOG.md
+- ROADMAP.md
