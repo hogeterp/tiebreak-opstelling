@@ -238,3 +238,11 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .quality-grid b{white-space:nowrap}
 .score-weight-grid{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}
 @media(max-width:520px){.quality-grid{grid-template-columns:1fr}.quality-score{font-size:1.2rem}}
+
+/* v2.0.2 archief */
+.archive-view-card h2{margin-bottom:3px}
+.lock-badge{display:inline-flex;align-items:center;padding:6px 9px;border-radius:999px;font-size:.76rem;font-weight:700;white-space:nowrap}
+.lock-badge.locked{background:#eef0f1;color:#4d565b;border:1px solid #cfd5d8}
+.lock-badge.unlocked{background:#fff4d6;color:#6f4d00;border:1px solid #e5c66d}
+.archive-schedule{margin-top:12px}
+#org-archive .action-row{margin-top:10px}

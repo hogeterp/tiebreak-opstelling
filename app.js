@@ -28,6 +28,7 @@ const state = {
   selections: {},
   schedules: {},
   archiveDates: [],
+  archiveLocks: {},
   skippedDates: [],
   scoreWeights: {...DEFAULT_SCORE_WEIGHTS},
   defaultCourts: [5,6,9,10],
@@ -58,10 +59,24 @@ function getRecentPastTuesday(now = new Date()) {
 }
 
 function organizerDates() {
-  const recent = getRecentPastTuesday();
-  return [...new Set([recent, ...state.dates, ...state.archiveDates])]
+  const unlockedArchiveDates = state.archiveDates.filter(date => state.archiveLocks[date] === false);
+  return [...new Set([...state.dates, ...unlockedArchiveDates])]
     .filter(date => !state.skippedDates.includes(date))
     .sort((a,b)=>b.localeCompare(a));
+}
+
+function isArchiveDate(date) {
+  return Boolean(date && state.archiveDates.includes(date) && !state.dates.includes(date));
+}
+
+function isArchiveLocked(date) {
+  return isArchiveDate(date) && state.archiveLocks[date] !== false;
+}
+
+function assertEditable(date) {
+  if (!isArchiveLocked(date)) return true;
+  alert("Deze speelavond staat vergrendeld in het archief. Ontgrendel hem eerst als organisator.");
+  return false;
 }
 
 function getOpenTuesdays(now = new Date()) {
@@ -186,6 +201,7 @@ async function loadEveningSettings(date, forceFresh=false) {
 }
 
 async function saveEveningSettings(date, settings) {
+  if (!assertEditable(date)) return;
   state.settings[date] = settings;
   await setDoc(doc(db, "evenings", date), settings, { merge:true });
   await saveArchiveSnapshot(date);
@@ -215,7 +231,8 @@ function switchOrg(tab) {
   $(`org-${tab}`).classList.remove("hidden");
   if (tab === "evening") renderOrganizerEvening();
   if (tab === "schedule") renderSchedulePanel();
-  if (tab === "manage") { renderAdminPlayers(); renderStatistics(); }
+  if (tab === "manage") { renderAdminPlayers(); renderStatistics(); renderArchive(); }
+  if (tab === "archive") renderArchiveViewer();
 }
 
 async function renderOrganizerGate() {
@@ -313,6 +330,7 @@ function renderParticipantDates() {
 }
 
 async function setResponse(date, playerId, status, source) {
+  if (source === "organisator" && !assertEditable(date)) return;
   await setDoc(doc(db, "playingDates", date, "responses", playerId), {
     playerId, status, source, updatedAt:serverTimestamp()
   });
@@ -407,6 +425,7 @@ function sortedCandidates(date) {
 }
 
 async function automaticSelection(date) {
+  if (!assertEditable(date)) return;
   const settings = await loadEveningSettings(date);
   const capacity = settings.courtCount * 4;
   const candidates = sortedCandidates(date);
@@ -439,6 +458,7 @@ function renderSelectionSummary(date) {
 }
 
 function openSelectionEditor(date) {
+  if (!assertEditable(date)) return;
   const current = state.selections[date] || { playingIds:[] };
   $("selectionEditor").innerHTML = `<div class="selection-checks">${sortedCandidates(date).map(p => `
     <label><input type="checkbox" value="${p.id}" ${current.playingIds.includes(p.id)?"checked":""}>${escapeHtml(displayName(p))}</label>
@@ -449,6 +469,7 @@ function openSelectionEditor(date) {
 
 async function saveSelectionEditor() {
   const date = $("selectionDialog").dataset.date;
+  if (!assertEditable(date)) return;
   const settings = await loadEveningSettings(date);
   const checked = [...$("selectionEditor").querySelectorAll("input:checked")].map(x=>x.value);
   if (checked.length % 4 !== 0 || checked.length > settings.courtCount * 4) {
@@ -615,6 +636,7 @@ function evaluateScheduleQuality(round1,round2,history){
 }
 
 async function automaticSchedule(date) {
+  if (!assertEditable(date)) return;
   const output = $("scheduleOutput");
   try {
     const selection = state.selections[date];
@@ -737,24 +759,30 @@ function sortCourtsByConfiguredOrder(round, configuredCourts) {
   });
 }
 
-async function renderSchedule(date) {
-  const s=state.schedules[date];
-  if (!s) {$("scheduleOutput").innerHTML="<p>Nog geen indeling gemaakt.</p>";return}
-  const settings=await loadEveningSettings(date,true);
-  const round1=sortCourtsByConfiguredOrder(s.round1,settings.courts);
-  const round2=sortCourtsByConfiguredOrder(s.round2,settings.courts);
+function scheduleHtml(schedule, settings, date) {
+  if (!schedule) return "<p>Voor deze avond is geen indeling opgeslagen.</p>";
+  const round1=sortCourtsByConfiguredOrder(schedule.round1,settings.courts);
+  const round2=sortCourtsByConfiguredOrder(schedule.round2,settings.courts);
   const renderRound=(title,round)=>`<div class="round"><h3>${title}</h3><div class="courts-grid">${round.map(c=>`
     <div class="court-card"><strong>Baan ${c.court}</strong>
       <div class="match-line team-line">${escapeHtml(teamText(c.team1))}</div>
       <div class="vs-line">-</div>
       <div class="match-line team-line">${escapeHtml(teamText(c.team2))}</div>
     </div>`).join("")}</div></div>`;
-  const quality=s.quality || (s.mode==="automatic"?evaluateScheduleQuality(round1,round2,buildHistory("all",date)):null);
-  const qualityHtml=quality?`<div class="quality-card"><div class="quality-head"><div><strong>Indelingskwaliteit</strong><span>${s.examined?`Beste uit ${Number(s.examined).toLocaleString("nl-NL")} onderzochte indelingen`:"Beoordeling van deze indeling"}</span></div><div class="quality-score">${quality.total}/100</div></div><div class="quality-grid"><span>Ratingbalans <b>${quality.rating}%</b></span><span>Mixdubbels <b>${quality.mix}%</b></span><span>Nieuwe partners <b>${quality.partners}%</b></span><span>Nieuwe tegenstanders <b>${quality.opponents}%</b></span><span>Nieuwe viertallen <b>${quality.groups}%</b></span><span>Geen dubbel koppel <b>${quality.duplicatePairs}%</b></span></div></div>`:"";
-  $("scheduleOutput").innerHTML=qualityHtml+renderRound("Supertie Ronde 1",round1)+renderRound("Supertie Ronde 2",round2);
+  const quality=schedule.quality || (schedule.mode==="automatic"?evaluateScheduleQuality(round1,round2,buildHistory("all",date)):null);
+  const qualityHtml=quality?`<div class="quality-card"><div class="quality-head"><div><strong>Indelingskwaliteit</strong><span>${schedule.examined?`Beste uit ${Number(schedule.examined).toLocaleString("nl-NL")} onderzochte indelingen`:"Beoordeling van deze indeling"}</span></div><div class="quality-score">${quality.total}/100</div></div><div class="quality-grid"><span>Ratingbalans <b>${quality.rating}%</b></span><span>Mixdubbels <b>${quality.mix}%</b></span><span>Nieuwe partners <b>${quality.partners}%</b></span><span>Nieuwe tegenstanders <b>${quality.opponents}%</b></span><span>Nieuwe viertallen <b>${quality.groups}%</b></span><span>Geen dubbel koppel <b>${quality.duplicatePairs}%</b></span></div></div>`:"";
+  return qualityHtml+renderRound("Supertie Ronde 1",round1)+renderRound("Supertie Ronde 2",round2);
+}
+
+async function renderSchedule(date) {
+  const schedule=state.schedules[date];
+  if (!schedule) {$("scheduleOutput").innerHTML="<p>Nog geen indeling gemaakt.</p>";return}
+  const settings=await loadEveningSettings(date,true);
+  $("scheduleOutput").innerHTML=scheduleHtml(schedule,settings,date);
 }
 
 async function openManualEditor(date) {
+  if (!assertEditable(date)) return;
   const selection=state.selections[date];
   if (!selection || selection.playingIds.length<4){
     alert("Maak eerst een deelnemersselectie.");
@@ -1007,6 +1035,7 @@ async function saveLearningRecord(date, round1, round2, source="manual") {
 
 async function saveManualSchedule() {
   const date=$("manualDialog").dataset.date;
+  if (!assertEditable(date)) return;
 
   if (!validateManualEditor()) {
     alert("Maak eerst beide supertierondes volledig en zonder dubbele spelers.");
@@ -1458,6 +1487,7 @@ async function saveArchiveSnapshot(date) {
     responsesJson:JSON.stringify(responses),
     selectionJson:JSON.stringify(selection),
     scheduleJson:JSON.stringify(schedule),
+    locked: state.archiveLocks[date] !== false,
     updatedAt:serverTimestamp()
   }, {merge:true});
   if (!state.archiveDates.includes(date)) state.archiveDates.push(date);
@@ -1470,6 +1500,7 @@ async function loadArchiveData() {
     const data = d.data();
     const date = data.date || d.id;
     dates.push(date);
+    state.archiveLocks[date] = data.locked !== false;
     try { if (data.settingsJson) state.settings[date] = JSON.parse(data.settingsJson); } catch(_) {}
     try { if (data.responsesJson) state.responses[date] = JSON.parse(data.responsesJson); } catch(_) {}
     try { if (data.selectionJson) state.selections[date] = JSON.parse(data.selectionJson); } catch(_) {}
@@ -1479,10 +1510,27 @@ async function loadArchiveData() {
   renderArchive();
 }
 
+function archiveSummaryHtml(date) {
+  const settings = state.settings[date] || defaultEveningSettings(date);
+  const schedule = state.schedules[date];
+  const selection = state.selections[date];
+  const playingIds = selection?.playingIds || [];
+  const playerNames = playingIds.map(id => playerById(id)).filter(Boolean).map(displayName);
+  const rounds = scheduleHtml(schedule, settings, date);
+  return `<div class="card archive-view-card">
+    <div class="row between wrap">
+      <div><h2>${escapeHtml(capitalize(formatDate(date)))}</h2><div class="player-meta">${playingIds.length} spelers · banen ${(settings.courts||[]).join(", ") || "niet vastgelegd"}</div></div>
+      <span class="lock-badge ${isArchiveLocked(date)?"locked":"unlocked"}">${isArchiveLocked(date)?"🔒 Vergrendeld":"🔓 Ontgrendeld"}</span>
+    </div>
+    ${playerNames.length ? `<details><summary>Deelnemers (${playerNames.length})</summary><p>${playerNames.map(escapeHtml).join(", ")}</p></details>` : ""}
+    <div class="archive-schedule">${rounds}</div>
+  </div>`;
+}
+
 function renderArchive() {
   const el = $("archiveList");
   if (!el) return;
-  const dates = state.archiveDates.filter(d => d < state.dates[0]).sort((a,b)=>b.localeCompare(a));
+  const dates = state.archiveDates.filter(d => !state.dates.includes(d)).sort((a,b)=>b.localeCompare(a));
   if (!dates.length) {
     el.innerHTML = "<p>Nog geen opgeslagen speelavonden.</p>";
     return;
@@ -1492,18 +1540,67 @@ function renderArchive() {
     const selection = state.selections[date];
     const count = selection?.playingIds?.length || 0;
     return `<div class="archive-row">
-      <div><strong>${escapeHtml(capitalize(formatDate(date)))}</strong><div class="player-meta">${count} spelers · ${schedule?.mode==="manual"?"handmatig":schedule?"automatisch":"geen indeling"}</div></div>
+      <div><strong>${escapeHtml(capitalize(formatDate(date)))}</strong><div class="player-meta">${count} spelers · ${schedule?.mode==="manual"?"handmatig":schedule?"automatisch":"geen indeling"} · ${isArchiveLocked(date)?"vergrendeld":"ontgrendeld"}</div></div>
       <button type="button" class="secondary" data-archive-date="${date}">Bekijken</button>
     </div>`;
   }).join("");
   el.querySelectorAll("[data-archive-date]").forEach(btn => btn.addEventListener("click", () => {
-    const date = btn.dataset.archiveDate;
-    switchOrg("schedule");
-    fillDateSelects();
-    $("scheduleDateSelect").value = date;
-    renderSelectionSummary(date);
-    renderSchedule(date);
+    switchOrg("archive");
+    $("archiveDateSelect").value = btn.dataset.archiveDate;
+    renderArchiveViewer();
   }));
+}
+
+function renderArchiveViewer() {
+  const select = $("archiveDateSelect");
+  const output = $("archiveViewer");
+  if (!select || !output) return;
+  const dates = state.archiveDates.filter(d => !state.dates.includes(d)).sort((a,b)=>b.localeCompare(a));
+  const current = dates.includes(select.value) ? select.value : dates[0];
+  select.innerHTML = dates.map(d=>`<option value="${d}">${escapeHtml(capitalize(formatDate(d)))}</option>`).join("");
+  if (!current) {
+    output.innerHTML = "<div class=\"card\"><p>Nog geen gearchiveerde speelavonden.</p></div>";
+    return;
+  }
+  select.value = current;
+  output.innerHTML = archiveSummaryHtml(current);
+  const locked = isArchiveLocked(current);
+  $("unlockArchive").classList.toggle("hidden", !locked);
+  $("relockArchive").classList.toggle("hidden", locked);
+  $("editArchiveEvening").classList.toggle("hidden", locked);
+  $("editArchiveSchedule").classList.toggle("hidden", locked);
+}
+
+async function setArchiveLock(date, locked) {
+  state.archiveLocks[date] = locked;
+  await setDoc(doc(db,"eveningArchive",date), {date, locked, updatedAt:serverTimestamp()}, {merge:true});
+  fillDateSelects();
+  renderArchive();
+  renderArchiveViewer();
+}
+
+async function unlockArchiveEvening() {
+  const date = $("archiveDateSelect").value;
+  if (!date) return;
+  if (!confirm("Weet je zeker dat je deze speelavond wilt ontgrendelen? Wijzigingen kunnen invloed hebben op statistieken en toekomstige automatische indelingen.")) return;
+  await setArchiveLock(date, false);
+}
+
+async function relockArchiveEvening() {
+  const date = $("archiveDateSelect").value;
+  if (!date) return;
+  await saveArchiveSnapshot(date);
+  await setArchiveLock(date, true);
+}
+
+function openUnlockedArchive(tab) {
+  const date = $("archiveDateSelect").value;
+  if (!date || isArchiveLocked(date)) return;
+  switchOrg(tab);
+  fillDateSelects();
+  const select = tab === "evening" ? $("orgDateSelect") : $("scheduleDateSelect");
+  select.value = date;
+  tab === "evening" ? renderOrganizerEvening() : renderSchedulePanel();
 }
 
 async function loadDefaultCourts() {
@@ -1621,6 +1718,11 @@ function attachEvents() {
   $("resetScoreWeights").onclick=resetScoreWeights;
   $("addNoPlayDate").onclick=addSkippedDate;
   $("saveDefaultCourts").onclick=saveDefaultCourts;
+  $("archiveDateSelect").onchange=renderArchiveViewer;
+  $("unlockArchive").onclick=unlockArchiveEvening;
+  $("relockArchive").onclick=relockArchiveEvening;
+  $("editArchiveEvening").onclick=()=>openUnlockedArchive("evening");
+  $("editArchiveSchedule").onclick=()=>openUnlockedArchive("schedule");
   $("logoutOrganizer").onclick=()=>{state.organizerOpen=false;sessionStorage.removeItem("organizerOpen");switchMain("participant")};
 }
 
@@ -1671,6 +1773,9 @@ async function init() {
   renderSkippedDates();
   renderDefaultCourtPicker();
   await loadArchiveData();
+  for (const date of state.archiveDates.filter(d => !state.dates.includes(d))) {
+    if (!(date in state.archiveLocks)) state.archiveLocks[date] = true;
+  }
   onSnapshot(collection(db,"players"),async snap=>{
     const loadedPlayers=snap.docs.map(d=>({id:d.id,...d.data()}));
     const migrated=await ensureUniquePlayerNumbers(loadedPlayers);

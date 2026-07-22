@@ -11,3 +11,10 @@
 
 - [ ] Praktijktest door Carel.
 - [ ] Eventuele fouten en kleine verbeteringen verwerken.
+
+
+## Afgerond in v2.0.2
+- [x] Eigen archiefscherm
+- [x] Automatisch scheiden van actieve en gespeelde avonden vanaf dinsdag 21:00
+- [x] Archief standaard alleen-lezen
+- [x] Ontgrendelen en opnieuw vergrendelen door organisator

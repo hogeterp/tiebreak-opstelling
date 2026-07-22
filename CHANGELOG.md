@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.2
+
+- Speelavonden die voorbij zijn, staan vanaf dinsdag 21:00 alleen nog in het archief.
+- Het archief heeft nu een eigen scherm en toont oude deelnemers, banen en indelingen.
+- Archiefavonden zijn standaard vergrendeld en niet per ongeluk te wijzigen.
+- De organisator kan een archiefavond tijdelijk ontgrendelen, corrigeren en opnieuw vergrendelen.
+- Een ontgrendelde archiefavond verschijnt tijdelijk bij Speelavond en Indeling.
+
 ## v2.0.1
 
 - Opgelost: een datum die als **Geen Supertie-speeldag** is ingesteld, verdwijnt nu ook uit de keuzelijsten bij Speelavond, Indeling en WhatsApp.
