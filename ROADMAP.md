@@ -8,9 +8,9 @@
 - [x] Partner- en tegenstanderhistorie uitlezen
 - [x] Speelstatistieken over 10, 20 of alle avonden
 - [x] Waarschuwingen bij handmatig indelen
-- [ ] Automatische indeling met historische puntenscore
-- [ ] Geen gelijk koppel in ronde 1 en ronde 2 bij automatisch indelen
-- [ ] Dezelfde vier spelers automatisch zo veel mogelijk vermijden
+- [x] Automatische indeling met historische puntenscore
+- [x] Geen gelijk koppel in ronde 1 en ronde 2 bij automatisch indelen
+- [x] Dezelfde vier spelers automatisch zo veel mogelijk vermijden
 - [ ] Praktijktest door Carel
 
 ## Later

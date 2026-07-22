@@ -456,39 +456,123 @@ async function saveSelectionEditor() {
   renderSelectionSummary(date);
 }
 
-function scoreGroup(group) {
-  const ratings = group.map(p=>Number(p.rating ?? 9));
-  const spread = Math.max(...ratings)-Math.min(...ratings);
-  const women = group.filter(p=>p.gender==="Vrouw").length;
-  let genderPenalty = 0;
-  if (women===2) genderPenalty = -1.5;
-  if (women===4) genderPenalty = Math.random()<0.25 ? -0.5 : 0.5;
-  return spread + genderPenalty;
-}
-
-function makeGroups(players, count) {
-  const remaining = [...players];
-  const groups = [];
-  while (remaining.length >= 4 && groups.length < count) {
-    let best = null;
-    for (let a=0;a<remaining.length-3;a++) for (let b=a+1;b<remaining.length-2;b++)
-      for (let c=b+1;c<remaining.length-1;c++) for (let d=c+1;d<remaining.length;d++) {
-        const idx=[a,b,c,d], group=idx.map(i=>remaining[i]), score=scoreGroup(group);
-        if (!best || score<best.score) best={idx,group,score};
-      }
-    groups.push(best.group);
-    best.idx.sort((x,y)=>y-x).forEach(i=>remaining.splice(i,1));
+function shuffleCopy(items) {
+  const copy=[...items];
+  for(let i=copy.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [copy[i],copy[j]]=[copy[j],copy[i]];
   }
-  return groups;
+  return copy;
 }
 
-function pairingsForGroup(group) {
-  const sorted=[...group].sort((a,b)=>Number(a.rating??9)-Number(b.rating??9));
-  const [a,b,c,d]=sorted;
-  return {
-    round1:[[a,d],[b,c]],
-    round2:[[a,c],[b,d]]
-  };
+function allPairings(group) {
+  const [a,b,c,d]=group;
+  return [
+    {team1:[a,b],team2:[c,d]},
+    {team1:[a,c],team2:[b,d]},
+    {team1:[a,d],team2:[b,c]}
+  ];
+}
+
+function isMixedTeam(team) {
+  if(team.length!==2) return false;
+  const genders=team.map(p=>p.gender);
+  return genders.includes("Man") && genders.includes("Vrouw");
+}
+
+function scoreMatch(pairing, history, previousPairKeys=new Set(), previousFourKeys=new Set()) {
+  const ids1=pairing.team1.map(p=>p.id);
+  const ids2=pairing.team2.map(p=>p.id);
+  const allIds=[...ids1,...ids2];
+  const avg1=pairing.team1.reduce((sum,p)=>sum+Number(p.rating??9),0)/2;
+  const avg2=pairing.team2.reduce((sum,p)=>sum+Number(p.rating??9),0)/2;
+  const ratings=[...pairing.team1,...pairing.team2].map(p=>Number(p.rating??9));
+
+  let score=0;
+  score += Math.abs(avg1-avg2)*40;                         // zo gelijk mogelijke teams
+  score += (Math.max(...ratings)-Math.min(...ratings))*2; // geen extreem brede baan
+
+  const women=allIds.map(id=>playerById(id)?.gender).filter(g=>g==="Vrouw").length;
+  if(women===2 && isMixedTeam(pairing.team1) && isMixedTeam(pairing.team2)) score-=20;
+  else if(women===2) score+=12;
+
+  const pair1=pairKey(ids1[0],ids1[1]);
+  const pair2=pairKey(ids2[0],ids2[1]);
+  score += (history.partnerCounts.get(pair1)||0)*20;
+  score += (history.partnerCounts.get(pair2)||0)*20;
+
+  ids1.forEach(a=>ids2.forEach(b=>{
+    score += (history.opponentCounts.get(pairKey(a,b))||0)*6;
+  }));
+
+  score += (history.fourCounts.get(fourKey(allIds))||0)*10;
+
+  // Harde regel: hetzelfde koppel mag niet in beide rondes voorkomen.
+  if(previousPairKeys.has(pair1) || previousPairKeys.has(pair2)) score+=100000;
+  // Dezelfde vier spelers in beide rondes liever niet.
+  if(previousFourKeys.has(fourKey(allIds))) score+=120;
+
+  return score;
+}
+
+function roundKeys(round) {
+  const pairKeys=new Set();
+  const fourKeys=new Set();
+  round.forEach(court=>{
+    if(court.team1?.length===2) pairKeys.add(pairKey(court.team1[0],court.team1[1]));
+    if(court.team2?.length===2) pairKeys.add(pairKey(court.team2[0],court.team2[1]));
+    const ids=[...(court.team1||[]),...(court.team2||[])];
+    if(ids.length===4) fourKeys.add(fourKey(ids));
+  });
+  return {pairKeys,fourKeys};
+}
+
+function makeRoundCandidate(players, courts, history, previousRound=null) {
+  const shuffled=shuffleCopy(players);
+  const previous=previousRound ? roundKeys(previousRound) : {pairKeys:new Set(),fourKeys:new Set()};
+  const round=[];
+  let score=0;
+
+  for(let i=0;i<courts.length;i++){
+    const group=shuffled.slice(i*4,i*4+4);
+    if(group.length<4) return null;
+    let best=null;
+    allPairings(group).forEach(pairing=>{
+      const pairingScore=scoreMatch(pairing,history,previous.pairKeys,previous.fourKeys);
+      if(!best || pairingScore<best.score) best={pairing,score:pairingScore};
+    });
+    score+=best.score;
+    round.push({
+      court:courts[i],
+      players:group.map(p=>p.id),
+      team1:best.pairing.team1.map(p=>p.id),
+      team2:best.pairing.team2.map(p=>p.id)
+    });
+  }
+  return {round,score};
+}
+
+function hasDuplicatePairAcrossRounds(round1,round2) {
+  const first=roundKeys(round1).pairKeys;
+  return [...roundKeys(round2).pairKeys].some(key=>first.has(key));
+}
+
+function createSmartSchedule(players,courts,history) {
+  let best=null;
+  const iterations=Math.max(1800,players.length*220);
+
+  for(let i=0;i<iterations;i++){
+    const first=makeRoundCandidate(players,courts,history);
+    if(!first) continue;
+    const second=makeRoundCandidate(players,courts,history,first.round);
+    if(!second || hasDuplicatePairAcrossRounds(first.round,second.round)) continue;
+
+    const total=first.score+second.score;
+    if(!best || total<best.score) best={round1:first.round,round2:second.round,score:total};
+  }
+
+  if(!best) throw new Error("Er kon geen indeling worden gevonden zonder hetzelfde koppel in beide rondes.");
+  return best;
 }
 
 async function automaticSchedule(date) {
@@ -507,64 +591,49 @@ async function automaticSchedule(date) {
 
     const availableCourts = Array.isArray(settings.courts) ? settings.courts : [];
     const groupCount = Math.min(availableCourts.length, Math.floor(players.length / 4));
+    if (groupCount < 1) throw new Error("Kies eerst minimaal één baan bij Speelavond.");
 
-    if (groupCount < 1) {
-      throw new Error("Kies eerst minimaal één baan bij Speelavond.");
+    const scheduledPlayers=players.slice(0,groupCount*4);
+    if(scheduledPlayers.length!==players.length){
+      throw new Error("Het aantal geselecteerde spelers past niet precies op het aantal beschikbare banen.");
     }
 
-    const groups = makeGroups(players, groupCount);
-    if (!groups.length) {
-      throw new Error("De app kon geen geldige groepen van vier spelers maken.");
-    }
+    output.innerHTML='<div class="message"><strong>Slimme indeling wordt berekend…</strong><br>De app vergelijkt veel mogelijke combinaties.</div>';
+    await new Promise(resolve=>setTimeout(resolve,20));
 
-    const courts = availableCourts.slice(0, groupCount);
-    const round1 = [];
-    const round2 = [];
-
-    groups.forEach((group, i) => {
-      const pairs = pairingsForGroup(group);
-      round1.push({
-        court: courts[i],
-        players: group.map(p => p.id),
-        team1: pairs.round1[0].map(p => p.id),
-        team2: pairs.round1[1].map(p => p.id)
-      });
-
-      const shiftedCourt = courts[(i + 1) % courts.length];
-      round2.push({
-        court: shiftedCourt,
-        players: group.map(p => p.id),
-        team1: pairs.round2[0].map(p => p.id),
-        team2: pairs.round2[1].map(p => p.id)
-      });
-    });
-
-    const sortedRound1=sortCourtsByConfiguredOrder(round1,settings.courts);
-    const sortedRound2=sortCourtsByConfiguredOrder(round2,settings.courts);
+    const courts=availableCourts.slice(0,groupCount);
+    const history=buildHistory("all",date);
+    const smart=createSmartSchedule(scheduledPlayers,courts,history);
+    const sortedRound1=sortCourtsByConfiguredOrder(smart.round1,settings.courts);
+    const sortedRound2=sortCourtsByConfiguredOrder(smart.round2,settings.courts);
 
     const schedule = {
       date,
       round1:sortedRound1,
       round2:sortedRound2,
-      createdAt: new Date().toISOString(),
-      mode: "automatic"
+      createdAt:new Date().toISOString(),
+      mode:"automatic",
+      algorithm:"historical-score-v2",
+      score:Math.round(smart.score*10)/10
     };
 
-    // Firestore-veilige opslag: de complete indeling als JSON-tekst.
-    await setDoc(doc(db, "schedules", date), {
-      scheduleJson: JSON.stringify(schedule),
+    await setDoc(doc(db,"schedules",date),{
+      scheduleJson:JSON.stringify(schedule),
       date,
-      mode: "automatic",
-      updatedAt: serverTimestamp()
+      mode:"automatic",
+      algorithm:"historical-score-v2",
+      score:schedule.score,
+      updatedAt:serverTimestamp()
     });
 
-    state.schedules[date] = schedule;
+    state.schedules[date]=schedule;
+    await saveLearningRecord(date,sortedRound1,sortedRound2,"automatic");
     await saveArchiveSnapshot(date);
-    await logAction("automatische_indeling", { date });
+    await logAction("automatische_indeling",{date,algorithm:"historical-score-v2",score:schedule.score});
     renderSchedule(date);
   } catch (error) {
-    console.error("Automatische indeling mislukt:", error);
-    output.innerHTML = `<div class="message error"><strong>Indeling maken mislukt.</strong><br>${escapeHtml(error.message || "Onbekende fout")}</div>`;
+    console.error("Automatische indeling mislukt:",error);
+    output.innerHTML=`<div class="message error"><strong>Indeling maken mislukt.</strong><br>${escapeHtml(error.message||"Onbekende fout")}</div>`;
   }
 }
 
@@ -880,12 +949,13 @@ function buildLearningRecord(date, round1, round2) {
   };
 }
 
-async function saveLearningRecord(date, round1, round2) {
+async function saveLearningRecord(date, round1, round2, source="manual") {
   const learningRecord=buildLearningRecord(date,round1,round2);
+  learningRecord.source=source;
   await setDoc(doc(db,"learningSchedules",date),{
     learningJson:JSON.stringify(learningRecord),
     date,
-    source:"manual",
+    source,
     updatedAt:serverTimestamp()
   });
 }

@@ -1,11 +1,5 @@
-# Supertiebreak-opstelling
+# Supertiebreak-opstelling v2.0.0
 
-Webapp voor de dinsdagavond Supertiebreak bij Tennisvereniging Nieuw-Vennep.
+Webapp voor de dinsdagavond-superiebreaks van Tennisvereniging Nieuw-Vennep.
 
-## Versie
-
-v2.0.0 – stap 2
-
-Deze stap bevat lidmaatschappen, overgeslagen speelavonden, het speelavondenarchief, partner- en tegenstanderstatistieken en waarschuwingen bij handmatig indelen.
-
-De slimme automatische indeling met historische puntenscore volgt in stap 3.
+Versie 2.0 bevat lidmaatschappen, overgeslagen speelavonden, statistieken, handmatige waarschuwingen en een slimme automatische indeling. De automatische indeling gebruikt rating, mixmogelijkheden en de historie van partners en tegenstanders en voorkomt hetzelfde koppel in beide rondes.

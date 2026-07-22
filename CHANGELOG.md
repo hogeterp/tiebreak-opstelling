@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.0.0 – stap 3
+
+- Slimme automatische indeling met historische puntenscore toegevoegd.
+- De score houdt rekening met ratingbalans, mixdubbels, eerdere partners en eerdere tegenstanders.
+- Hetzelfde koppel wordt nooit in ronde 1 én ronde 2 gebruikt.
+- Dezelfde groep van vier spelers in beide rondes krijgt een zware straf en wordt daardoor zo veel mogelijk vermeden.
+- Combinaties die historisch vaak voorkwamen krijgen strafpunten, zodat er meer afwisseling ontstaat.
+- De app vergelijkt bij iedere automatische indeling veel mogelijke schema's en bewaart de beste gevonden indeling.
+- Automatische indelingen worden voortaan ook als leerrecord opgeslagen.
+
 ## v2.0.0 – stap 2
 
 - Speelstatistieken per speler toegevoegd.
