@@ -1,19 +1,11 @@
-# Supertiebreak-opstelling v2.0.0
+# Supertiebreak-opstelling
 
-Werkversie van v2.0.
+Webapp voor de dinsdagavond Supertiebreak bij Tennisvereniging Nieuw-Vennep.
 
-In deze stap toegevoegd:
-- vier soorten lidmaatschap;
-- Lid als standaard;
-- Geen Supertie-speeldagen;
-- streepje tussen de teams;
-- ROADMAP.md met de resterende v2.0-functies.
+## Versie
 
-Upload naar GitHub:
-- index.html
-- style.css
-- app.js
-- club-logo.png
-- README.md
-- CHANGELOG.md
-- ROADMAP.md
+v2.0.0 – stap 2
+
+Deze stap bevat lidmaatschappen, overgeslagen speelavonden, het speelavondenarchief, partner- en tegenstanderstatistieken en waarschuwingen bij handmatig indelen.
+
+De slimme automatische indeling met historische puntenscore volgt in stap 3.

@@ -571,6 +571,48 @@ async function automaticSchedule(date) {
 function playerById(id){return state.players.find(p=>p.id===id)}
 function teamText(team){return team.map(id=>displayName(playerById(id))).join(" & ")}
 
+function pairKey(a,b){return [a,b].sort().join("|")}
+function fourKey(ids){return [...ids].sort().join("|")}
+
+function completedScheduleDates(excludeDate="") {
+  return Object.keys(state.schedules)
+    .filter(date=>date!==excludeDate && state.schedules[date]?.round1 && state.schedules[date]?.round2)
+    .sort((a,b)=>b.localeCompare(a));
+}
+
+function datesForStatistics(period="10", excludeDate="") {
+  const dates=completedScheduleDates(excludeDate);
+  if(period==="all") return dates;
+  return dates.slice(0,Number(period)||10);
+}
+
+function buildHistory(period="all", excludeDate="") {
+  const partnerCounts=new Map();
+  const opponentCounts=new Map();
+  const fourCounts=new Map();
+  const appearances=new Map();
+  const dates=datesForStatistics(period,excludeDate);
+
+  const bump=(map,key)=>map.set(key,(map.get(key)||0)+1);
+  dates.forEach(date=>{
+    const schedule=state.schedules[date];
+    [schedule.round1||[],schedule.round2||[]].forEach(round=>{
+      round.forEach(court=>{
+        const t1=(court.team1||[]).filter(Boolean);
+        const t2=(court.team2||[]).filter(Boolean);
+        [...t1,...t2].forEach(id=>bump(appearances,id));
+        if(t1.length===2)bump(partnerCounts,pairKey(t1[0],t1[1]));
+        if(t2.length===2)bump(partnerCounts,pairKey(t2[0],t2[1]));
+        t1.forEach(a=>t2.forEach(b=>bump(opponentCounts,pairKey(a,b))));
+        if(t1.length===2&&t2.length===2)bump(fourCounts,fourKey([...t1,...t2]));
+      });
+    });
+  });
+  return {dates,partnerCounts,opponentCounts,fourCounts,appearances};
+}
+
+function countWith(map,a,b){return map.get(pairKey(a,b))||0}
+
 function sortCourtsByConfiguredOrder(round, configuredCourts) {
   const order=(configuredCourts||[]).map(Number);
   return [...(round||[])].sort((a,b)=>{
@@ -723,47 +765,70 @@ function validateManualEditor() {
   const selectedIds=selection?.playingIds||[];
   const selectedSet=new Set(selectedIds);
   const problems=[];
+  const warnings=[];
+  const rounds={1:readManualRound(1),2:readManualRound(2)};
 
   [1,2].forEach(roundNumber=>{
-    const round=readManualRound(roundNumber);
+    const round=rounds[roundNumber];
     const allIds=round.flatMap(court=>court.players);
     const filled=allIds.filter(Boolean);
 
-    if (allIds.some(id=>!id)) {
-      problems.push(`Supertie Ronde ${roundNumber}: nog niet alle plekken zijn ingevuld.`);
-    }
+    if (allIds.some(id=>!id)) problems.push(`Supertie Ronde ${roundNumber}: nog niet alle plekken zijn ingevuld.`);
 
     const duplicates=filled.filter((id,index)=>filled.indexOf(id)!==index);
     if (duplicates.length) {
-      const duplicateNames=[...new Set(duplicates)]
-        .map(id=>displayName(playerById(id)))
-        .join(", ");
+      const duplicateNames=[...new Set(duplicates)].map(id=>displayName(playerById(id))).join(", ");
       problems.push(`Supertie Ronde ${roundNumber}: dubbel gekozen: ${duplicateNames}.`);
     }
 
     const missing=selectedIds.filter(id=>!filled.includes(id));
-    if (missing.length) {
-      problems.push(
-        `Supertie Ronde ${roundNumber}: nog in te delen: ${missing.map(id=>displayName(playerById(id))).join(", ")}.`
-      );
-    }
+    if (missing.length) problems.push(`Supertie Ronde ${roundNumber}: nog in te delen: ${missing.map(id=>displayName(playerById(id))).join(", ")}.`);
 
     const unknown=filled.filter(id=>!selectedSet.has(id));
-    if (unknown.length) {
-      problems.push(`Supertie Ronde ${roundNumber}: bevat een speler buiten de selectie.`);
-    }
+    if (unknown.length) problems.push(`Supertie Ronde ${roundNumber}: bevat een speler buiten de selectie.`);
   });
+
+  if (!problems.length) {
+    const history=buildHistory("all",date);
+    const round1Pairs=new Set(rounds[1].flatMap(c=>[pairKey(...c.team1),pairKey(...c.team2)]));
+    rounds[2].forEach(court=>{
+      [court.team1,court.team2].forEach(team=>{
+        if(round1Pairs.has(pairKey(...team))) warnings.push(`${teamText(team)} speelt in beide rondes samen.`);
+      });
+    });
+
+    const round1Fours=new Set(rounds[1].map(c=>fourKey(c.players)));
+    rounds[2].forEach(court=>{
+      if(round1Fours.has(fourKey(court.players))) warnings.push(`Dezelfde vier spelers staan in beide rondes tegenover elkaar op baan ${court.court}.`);
+    });
+
+    [1,2].forEach(roundNumber=>rounds[roundNumber].forEach(court=>{
+      [court.team1,court.team2].forEach(team=>{
+        const count=countWith(history.partnerCounts,team[0],team[1]);
+        if(count>0) warnings.push(`${teamText(team)} speelde historisch al ${count}× samen.`);
+      });
+      const opponents=[];
+      court.team1.forEach(a=>court.team2.forEach(b=>{
+        const count=countWith(history.opponentCounts,a,b);
+        if(count>0) opponents.push(`${displayName(playerById(a))} – ${displayName(playerById(b))}: ${count}×`);
+      }));
+      if(opponents.length) warnings.push(`Baan ${court.court}, ronde ${roundNumber}: eerdere tegenstanders: ${opponents.join(", ")}.`);
+    }));
+  }
 
   const status=$("manualStatus");
   const saveButton=$("saveManualSchedule");
   const valid=problems.length===0;
 
-  if (valid) {
-    status.className="manual-status success";
-    status.innerHTML="Alle spelers zijn in beide supertierondes precies één keer ingedeeld.";
-  } else {
+  if (!valid) {
     status.className="manual-status error";
     status.innerHTML=problems.map(problem=>`<div>${escapeHtml(problem)}</div>`).join("");
+  } else if (warnings.length) {
+    status.className="manual-status warning";
+    status.innerHTML=`<strong>Indeling is geldig, maar let op:</strong>${[...new Set(warnings)].map(warning=>`<div>⚠️ ${escapeHtml(warning)}</div>`).join("")}`;
+  } else {
+    status.className="manual-status success";
+    status.innerHTML="Alle spelers zijn in beide supertierondes precies één keer ingedeeld. Er zijn geen herhalingswaarschuwingen.";
   }
 
   saveButton.disabled=!valid;
@@ -1197,21 +1262,37 @@ async function exportBackup() {
 }
 
 function renderStatistics() {
-  const rows=state.players.map(p=>{
-    let yes=0,maybe=0,no=0,reserve=0,played=0,last="";
-    state.dates.forEach(d=>{
-      const status=responseMap(d)[p.id];
-      if(status==="yes")yes++;if(status==="maybe")maybe++;if(status==="no")no++;
-    });
-    Object.entries(state.selections).forEach(([d,s])=>{
-      if(s.playingIds?.includes(p.id)){played++;last=d}
-      if(s.reserveIds?.includes(p.id))reserve++;
-    });
-    return {p,yes,maybe,no,played,reserve,last};
-  });
-  $("statistics").innerHTML=`<table class="stats-table"><thead><tr><th>Speler</th><th>Ja</th><th>Miss.</th><th>Gespeeld</th><th>Reserve</th></tr></thead><tbody>${rows.map(r=>`
-    <tr><td>${escapeHtml(displayName(r.p))}</td><td>${r.yes}</td><td>${r.maybe}</td><td>${r.played}</td><td>${r.reserve}</td></tr>`).join("")}</tbody></table>`;
+  const playerSelect=$("statisticsPlayer");
+  const periodSelect=$("statisticsPeriod");
+  const target=$("statistics");
+  if(!playerSelect||!periodSelect||!target)return;
+
+  const previous=playerSelect.value;
+  playerSelect.innerHTML=state.players.map(p=>`<option value="${p.id}">${escapeHtml(displayName(p))}</option>`).join("");
+  if(previous&&state.players.some(p=>p.id===previous))playerSelect.value=previous;
+  const playerId=playerSelect.value||state.players[0]?.id;
+  if(playerId)playerSelect.value=playerId;
+  if(!playerId){target.innerHTML="<p>Nog geen spelers.</p>";return;}
+
+  const history=buildHistory(periodSelect.value||"10");
+  const rows=state.players.filter(p=>p.id!==playerId).map(other=>({
+    player:other,
+    together:countWith(history.partnerCounts,playerId,other.id),
+    against:countWith(history.opponentCounts,playerId,other.id)
+  })).filter(row=>row.together||row.against)
+    .sort((a,b)=>(b.together+b.against)-(a.together+a.against)||displayName(a.player).localeCompare(displayName(b.player),"nl"));
+
+  const playedRounds=history.appearances.get(playerId)||0;
+  const eveningCount=history.dates.filter(date=>{
+    const schedule=state.schedules[date];
+    return [schedule?.round1||[],schedule?.round2||[]].some(round=>round.some(c=>(c.players||[...(c.team1||[]),...(c.team2||[])]).includes(playerId)));
+  }).length;
+
+  target.innerHTML=`
+    <div class="stats-summary"><strong>${escapeHtml(displayName(playerById(playerId)))}</strong><span>${eveningCount} speelavonden · ${playedRounds} rondes</span></div>
+    ${rows.length?`<table class="stats-table"><thead><tr><th>Speler</th><th>Samen</th><th>Tegen</th></tr></thead><tbody>${rows.map(row=>`<tr><td>${escapeHtml(displayName(row.player))}</td><td>${row.together}</td><td>${row.against}</td></tr>`).join("")}</tbody></table>`:"<p>Voor deze periode zijn nog geen gespeelde combinaties gevonden.</p>"}`;
 }
+
 
 async function changePin() {
   const oldPin=$("oldPin").value.trim(),newPin=$("newPin").value.trim();
@@ -1354,6 +1435,8 @@ function attachEvents() {
   $("confirmImport").onclick=confirmImport;
   $("exportCsv").onclick=exportCsv;
   $("exportBackup").onclick=exportBackup;
+  $("statisticsPeriod").onchange=renderStatistics;
+  $("statisticsPlayer").onchange=renderStatistics;
   $("changePin").onclick=changePin;
   $("addNoPlayDate").onclick=addSkippedDate;
   $("logoutOrganizer").onclick=()=>{state.organizerOpen=false;sessionStorage.removeItem("organizerOpen");switchMain("participant")};

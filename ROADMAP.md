@@ -1,16 +1,19 @@
 # Roadmap Supertiebreak-opstelling
 
 ## v2.0.0
-- [x] Lidmaatschap: Lid, Ochtendlid, Competitielid, Geen lid.
-- [x] Lid is de standaardkeuze.
-- [x] Geen Supertie-speeldagen instellen.
-- [x] `vs` vervangen door een streepje.
-- [ ] Speelstatistieken: samen en tegen gespeeld.
-- [ ] Keuze laatste 10, laatste 20 of alle avonden.
-- [ ] Waarschuwingen bij handmatig indelen.
-- [ ] Geen herhaalde partner of dezelfde vier spelers in ronde 2.
-- [ ] Slimme automatische indeling met kwaliteitsscore.
 
-## Na praktijktest
-- [ ] Verbeteringen uit de eerste test door Carel.
-- [ ] Weging van de kwaliteitsscore eventueel instelbaar maken.
+- [x] Lidmaatschap: Lid, Ochtendlid, Competitielid en Geen lid
+- [x] Geen Supertie-speeldagen instellen
+- [x] Streepje tussen de teams
+- [x] Partner- en tegenstanderhistorie uitlezen
+- [x] Speelstatistieken over 10, 20 of alle avonden
+- [x] Waarschuwingen bij handmatig indelen
+- [ ] Automatische indeling met historische puntenscore
+- [ ] Geen gelijk koppel in ronde 1 en ronde 2 bij automatisch indelen
+- [ ] Dezelfde vier spelers automatisch zo veel mogelijk vermijden
+- [ ] Praktijktest door Carel
+
+## Later
+
+- [ ] Weging van de puntenscore eventueel instelbaar maken
+- [ ] Verbeteringen op basis van praktijktesten

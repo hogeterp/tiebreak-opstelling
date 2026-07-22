@@ -200,3 +200,24 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
 .archive-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
 .archive-row:last-child{border-bottom:0}
+
+.manual-status.warning{
+  background:#fff4d6;
+  color:#6f4d00;
+  border:1px solid #e5c66d;
+}
+.manual-status.warning div{margin-top:5px}
+.stats-filters{margin-bottom:10px}
+.stats-summary{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  padding:10px;
+  margin-bottom:8px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:#fff;
+}
+.stats-summary span{font-size:.78rem;color:var(--gray);text-align:right}
+.stats-table th:nth-child(n+2),.stats-table td:nth-child(n+2){text-align:center}

@@ -1,17 +1,22 @@
-# Wijzigingen
+# Changelog
 
-## v2.0.0 - stap 1
-- Lidmaatschap uitgebreid naar Lid, Ochtendlid, Competitielid en Geen lid.
-- Lid is standaard voor nieuwe en bestaande spelers.
-- Organisator kan dinsdagen instellen als Geen Supertie-speeldag.
-- Overgeslagen dinsdagen verdwijnen automatisch uit de twee open speeldata.
-- `vs` in de opstelling en handmatige editor vervangen door een streepje.
-- ROADMAP.md toegevoegd voor de resterende onderdelen van v2.0.
+## v2.0.0 – stap 2
 
-## v1.1.4
-- Speelavondenarchief toegevoegd.
-- Speelavonden worden als momentopname opgeslagen in Firebase.
-- Laatste afgelopen dinsdag blijft beschikbaar voor de organisator.
-- Nieuw spelersveld: lid van TV Nieuw-Vennep (Ja/Nee).
-- Bestaande spelers worden automatisch op Ja gezet.
-- Lidstatus toegevoegd aan spelerslijst en CSV-export.
+- Speelstatistieken per speler toegevoegd.
+- Keuze uit de laatste 10, laatste 20 of alle opgeslagen speelavonden.
+- Per speler zichtbaar hoe vaak hij of zij met iedere speler samen en tegen iedere speler heeft gespeeld.
+- Handmatige indeling geeft waarschuwingen bij:
+  - hetzelfde koppel in ronde 1 en ronde 2;
+  - dezelfde vier spelers in beide rondes;
+  - koppels die historisch al samen speelden;
+  - spelers die historisch al tegen elkaar speelden.
+- Waarschuwingen blokkeren het opslaan niet; alleen onvolledige of ongeldige indelingen worden geblokkeerd.
+
+## v2.0.0 – stap 1
+
+- Vier soorten lidmaatschap toegevoegd: Lid, Ochtendlid, Competitielid en Geen lid.
+- Nieuwe en bestaande spelers krijgen standaard Lid.
+- De organisator kan dinsdagen markeren als Geen Supertie-speeldag.
+- Overgeslagen dinsdagen verschijnen niet bij de eerstvolgende twee speelavonden.
+- `vs` is vervangen door een streepje tussen de teams.
+- ROADMAP.md toegevoegd.
