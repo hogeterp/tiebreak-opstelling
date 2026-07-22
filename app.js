@@ -30,6 +30,7 @@ const state = {
   archiveDates: [],
   skippedDates: [],
   scoreWeights: {...DEFAULT_SCORE_WEIGHTS},
+  defaultCourts: [5,6,9,10],
   currentMessage: "",
   pendingImport: [],
   organizerOpen: sessionStorage.getItem("organizerOpen") === "1"
@@ -59,6 +60,7 @@ function getRecentPastTuesday(now = new Date()) {
 function organizerDates() {
   const recent = getRecentPastTuesday();
   return [...new Set([recent, ...state.dates, ...state.archiveDates])]
+    .filter(date => !state.skippedDates.includes(date))
     .sort((a,b)=>b.localeCompare(a));
 }
 
@@ -169,7 +171,8 @@ function getCounts(date) {
 }
 
 function defaultEveningSettings(date) {
-  return { date, courtCount:4, courts:[1,2,3,4], start:"20:00", end:"21:30" };
+  const courts = [...state.defaultCourts];
+  return { date, courtCount:courts.length, courts, start:"20:00", end:"21:30" };
 }
 
 async function loadEveningSettings(date, forceFresh=false) {
@@ -1503,6 +1506,42 @@ function renderArchive() {
   }));
 }
 
+async function loadDefaultCourts() {
+  const snap = await getDoc(doc(db,"settings","defaultCourts"));
+  const saved = snap.exists() && Array.isArray(snap.data().courts) ? snap.data().courts : [5,6,9,10];
+  state.defaultCourts = [...new Set(saved.map(Number).filter(n=>n>=1&&n<=10))].sort((a,b)=>a-b);
+  if (!state.defaultCourts.length) state.defaultCourts = [5,6,9,10];
+}
+
+function renderDefaultCourtPicker() {
+  const el=$("defaultCourtPicker");
+  if(!el) return;
+  const selected=new Set(state.defaultCourts);
+  el.innerHTML=Array.from({length:10},(_,i)=>i+1).map(n=>
+    `<button type="button" class="court-chip ${selected.has(n)?"active":""}" data-default-court="${n}">${n}</button>`
+  ).join("");
+  el.querySelectorAll("[data-default-court]").forEach(btn=>btn.onclick=()=>{
+    const n=Number(btn.dataset.defaultCourt);
+    const courts=new Set(state.defaultCourts);
+    courts.has(n)?courts.delete(n):courts.add(n);
+    if(courts.size>10) return;
+    state.defaultCourts=[...courts].sort((a,b)=>a-b);
+    renderDefaultCourtPicker();
+  });
+}
+
+async function saveDefaultCourts() {
+  if(!state.defaultCourts.length){showMessage($("defaultCourtsMessage"),"Kies minimaal één baan.","error");return;}
+  await setDoc(doc(db,"settings","defaultCourts"),{courts:state.defaultCourts,updatedAt:serverTimestamp()},{merge:true});
+  for(const date of state.dates){
+    const settings={...defaultEveningSettings(date),courts:[...state.defaultCourts],courtCount:state.defaultCourts.length};
+    state.settings[date]=settings;
+    await setDoc(doc(db,"evenings",date),settings,{merge:true});
+  }
+  showMessage($("defaultCourtsMessage"),`Standaardbanen ${state.defaultCourts.join(", ")} zijn opgeslagen en toegepast op de komende weken.`,"success");
+  if(state.organizerOpen) await renderOrganizerEvening();
+}
+
 async function loadSkippedDates() {
   const snap=await getDoc(doc(db,"settings","noPlayDates"));
   state.skippedDates=snap.exists() && Array.isArray(snap.data().dates) ? [...new Set(snap.data().dates)].sort() : [];
@@ -1581,6 +1620,7 @@ function attachEvents() {
   $("saveScoreWeights").onclick=saveScoreWeights;
   $("resetScoreWeights").onclick=resetScoreWeights;
   $("addNoPlayDate").onclick=addSkippedDate;
+  $("saveDefaultCourts").onclick=saveDefaultCourts;
   $("logoutOrganizer").onclick=()=>{state.organizerOpen=false;sessionStorage.removeItem("organizerOpen");switchMain("participant")};
 }
 
@@ -1624,10 +1664,12 @@ function subscribeResponses() {
 
 async function init() {
   await loadSkippedDates();
-    await loadScoreWeights();
+  await loadDefaultCourts();
+  await loadScoreWeights();
   state.dates=getOpenTuesdays();
   attachEvents();
   renderSkippedDates();
+  renderDefaultCourtPicker();
   await loadArchiveData();
   onSnapshot(collection(db,"players"),async snap=>{
     const loadedPlayers=snap.docs.map(d=>({id:d.id,...d.data()}));

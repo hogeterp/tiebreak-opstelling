@@ -1,40 +1,17 @@
 # Changelog
 
-## v2.0.0 – stap 3
+## v2.0.1
 
+- Opgelost: een datum die als **Geen Supertie-speeldag** is ingesteld, verdwijnt nu ook uit de keuzelijsten bij Speelavond, Indeling en WhatsApp.
+- Nieuwe instelling **Standaardbanen** toegevoegd.
+- Banen 5, 6, 9 en 10 staan standaard geselecteerd.
+- Met één knop worden de standaardbanen opgeslagen en toegepast op de komende twee speelavonden.
+- Nieuwe speelavonden gebruiken voortaan automatisch de ingestelde standaardbanen.
+
+## v2.0.0
+
+- Vier soorten lidmaatschap toegevoegd.
+- Geen Supertie-speeldagen toegevoegd.
+- Speelstatistieken en waarschuwingen bij handmatig indelen toegevoegd.
 - Slimme automatische indeling met historische puntenscore toegevoegd.
-- De score houdt rekening met ratingbalans, mixdubbels, eerdere partners en eerdere tegenstanders.
-- Hetzelfde koppel wordt nooit in ronde 1 én ronde 2 gebruikt.
-- Dezelfde groep van vier spelers in beide rondes krijgt een zware straf en wordt daardoor zo veel mogelijk vermeden.
-- Combinaties die historisch vaak voorkwamen krijgen strafpunten, zodat er meer afwisseling ontstaat.
-- De app vergelijkt bij iedere automatische indeling veel mogelijke schema's en bewaart de beste gevonden indeling.
-- Automatische indelingen worden voortaan ook als leerrecord opgeslagen.
-
-## v2.0.0 – stap 2
-
-- Speelstatistieken per speler toegevoegd.
-- Keuze uit de laatste 10, laatste 20 of alle opgeslagen speelavonden.
-- Per speler zichtbaar hoe vaak hij of zij met iedere speler samen en tegen iedere speler heeft gespeeld.
-- Handmatige indeling geeft waarschuwingen bij:
-  - hetzelfde koppel in ronde 1 en ronde 2;
-  - dezelfde vier spelers in beide rondes;
-  - koppels die historisch al samen speelden;
-  - spelers die historisch al tegen elkaar speelden.
-- Waarschuwingen blokkeren het opslaan niet; alleen onvolledige of ongeldige indelingen worden geblokkeerd.
-
-## v2.0.0 – stap 1
-
-- Vier soorten lidmaatschap toegevoegd: Lid, Ochtendlid, Competitielid en Geen lid.
-- Nieuwe en bestaande spelers krijgen standaard Lid.
-- De organisator kan dinsdagen markeren als Geen Supertie-speeldag.
-- Overgeslagen dinsdagen verschijnen niet bij de eerstvolgende twee speelavonden.
-- `vs` is vervangen door een streepje tussen de teams.
-- ROADMAP.md toegevoegd.
-
-## v2.0.0 - stap 4
-
-- Indelingskwaliteit van 0 tot 100 toegevoegd.
-- Deelresultaten voor ratingbalans, mixdubbels, nieuwe partners, nieuwe tegenstanders, nieuwe viertallen en dubbele koppels toegevoegd.
-- De app toont hoeveel geldige indelingen zijn onderzocht.
-- Organisator kan de wegingsfactoren van het automatische algoritme instellen.
-- Standaardwaarden kunnen met één knop worden teruggezet.
+- Indelingskwaliteit van 0 tot 100 en instelbare wegingen toegevoegd.
