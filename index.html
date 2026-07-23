@@ -23,7 +23,7 @@
   </a>
   <header class="topbar">
     <div>
-      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.1.2</span></div>
+      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.2.0</span></div>
       <p>Dinsdag 20:00–21:30</p>
     </div>
   </header>
@@ -148,6 +148,13 @@
               <button data-message="final" type="button">Definitieve indeling</button>
               <button data-message="incomplete" type="button">Gegevens aanvullen</button>
             </div>
+            <hr>
+            <h3>Speelavond afgelasten</h3>
+            <label for="cancellationReason">Reden (optioneel)</label>
+            <textarea id="cancellationReason" rows="3" placeholder="Bijvoorbeeld: Door de hevige regen zijn de banen onbespeelbaar."></textarea>
+            <div class="action-row">
+              <button data-message="cancel" class="danger" type="button">Speelavond afgelast</button>
+            </div>
           </div>
         </section>
 
@@ -218,6 +225,18 @@
             <div id="defaultCourtsMessage" class="message hidden"></div>
           </details>
 
+          <details class="card" open>
+            <summary>Niet samen op één baan</summary>
+            <p>Deze spelers worden bij de automatische indeling nooit op dezelfde baan gezet. Bij zelf indelen verschijnt een waarschuwing.</p>
+            <div class="field-grid">
+              <div><label for="forbiddenPlayer1">Speler 1</label><select id="forbiddenPlayer1"><option value="">Kies speler</option></select></div>
+              <div><label for="forbiddenPlayer2">Speler 2</label><select id="forbiddenPlayer2"><option value="">Kies speler</option></select></div>
+            </div>
+            <div class="action-row"><button id="addForbiddenPair" type="button">Combinatie toevoegen</button></div>
+            <div id="forbiddenPairsMessage" class="message hidden"></div>
+            <div id="forbiddenPairsList"></div>
+          </details>
+
           <details class="card">
             <summary>Geen Supertie-speeldagen</summary>
             <p>Kies een dinsdag waarop niet wordt gespeeld.</p>
@@ -245,7 +264,7 @@
           </details>
 
           <details class="card">
-            <summary>Nieuw in v2.1.0</summary>
+            <summary>Nieuw in v2.2.0</summary>
             <ul>
               <li>Speelavonden worden opgeslagen in een archief.</li>
               <li>De laatste speelavond blijft nog 7 dagen beschikbaar voor de organisator.</li>
@@ -254,9 +273,9 @@
               <li>In de opstelling staat een streepje tussen de teams.</li>
               <li>Partner- en tegenstanderstatistieken over 10, 20 of alle avonden.</li>
               <li>Waarschuwingen tijdens handmatig indelen bij herhaalde koppels en tegenstanders.</li>
-              <li>Indelingskwaliteit van 0 tot 100 met uitleg per onderdeel.</li>
-              <li>De app toont hoeveel geldige indelingen zijn onderzocht.</li>
-              <li>De organisator kan de wegingsfactoren van de automatische indeling aanpassen.</li>
+              <li>De automatische indeling kiest zelf de beste instellingen.</li>
+              <li>Spelers kunnen worden ingesteld die nooit samen op één baan mogen staan.</li>
+              <li>Nieuwe WhatsApp-melding voor een afgelaste speelavond met eigen reden.</li>
               <li>Een Geen Supertie-speeldag verdwijnt nu ook uit alle speelavondkeuzes.</li>
               <li>Standaardbanen 5, 6, 9 en 10 kunnen met één knop op de komende weken worden toegepast.</li>
               <li>Gespeelde avonden gaan vanaf dinsdag 21:00 naar een apart, alleen-lezen archief.</li>
@@ -264,23 +283,7 @@
             </ul>
           </details>
 
-          <details class="card">
-            <summary>Weging automatische indeling</summary>
-            <p>Een hogere waarde maakt dit onderdeel belangrijker. De standaardwaarden zijn al geschikt voor normaal gebruik.</p>
-            <div class="field-grid score-weight-grid">
-              <div><label for="weight_rating">Ratingbalans</label><input id="weight_rating" type="number" min="0" max="100" step="1"></div>
-              <div><label for="weight_spread">Ratingspreiding op baan</label><input id="weight_spread" type="number" min="0" max="100" step="1"></div>
-              <div><label for="weight_mix">Mixdubbels</label><input id="weight_mix" type="number" min="0" max="100" step="1"></div>
-              <div><label for="weight_partner">Nieuwe partners</label><input id="weight_partner" type="number" min="0" max="100" step="1"></div>
-              <div><label for="weight_opponent">Nieuwe tegenstanders</label><input id="weight_opponent" type="number" min="0" max="100" step="1"></div>
-              <div><label for="weight_four">Nieuwe viertallen</label><input id="weight_four" type="number" min="0" max="100" step="1"></div>
-            </div>
-            <div class="action-row">
-              <button id="saveScoreWeights" type="button">Wegingen opslaan</button>
-              <button id="resetScoreWeights" class="secondary" type="button">Standaardwaarden</button>
-            </div>
-            <div id="scoreWeightsMessage" class="message hidden"></div>
-          </details>
+
 
           <details class="card" open>
             <summary>Snelkoppeling op beginscherm</summary>

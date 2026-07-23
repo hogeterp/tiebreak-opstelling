@@ -1,8 +1,8 @@
-# Supertiebreak-opstelling v2.1.2
+# Supertiebreak-opstelling v2.2.0
 
 Webapp voor de wekelijkse Supertiebreak bij TV Nieuw-Vennep.
 
-## Nieuw in v2.1.2
+## Nieuw in v2.2.0
 
 - Nieuw professioneel appicoon met clublogo, tennisbal en de tekst **SUPERTIEBREAK**.
 - Nieuwe iconen voor Android, iPhone en iPad.

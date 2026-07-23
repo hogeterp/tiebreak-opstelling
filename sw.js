@@ -1,4 +1,4 @@
-const CACHE = 'supertiebreak-v2.1.2';
+const CACHE = 'supertiebreak-v2.2.0';
 const APP_SHELL = [
   './',
   './index.html',

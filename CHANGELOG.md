@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.0
+- Nieuwe beheerfunctie **Niet samen op één baan** toegevoegd.
+- De automatische indeling zet ingestelde spelers nooit op dezelfde baan.
+- Bij handmatig indelen verschijnt een waarschuwing wanneer zo'n combinatie toch op één baan staat.
+- Nieuwe WhatsApp-knop **Speelavond afgelast** met een vrij, optioneel tekstveld voor de reden.
+- Zonder ingevulde reden gebruikt de app automatisch een nette standaardtekst.
+- **Weging automatische indeling** uit Beheer verwijderd; de app gebruikt voortaan vaste, optimale instellingen.
+- De zichtbare score **Indelingskwaliteit** verwijderd om het indelingsscherm eenvoudiger te maken.
+- Versie- en cacheverwijzingen bijgewerkt naar v2.2.0.
+
 ## v2.1.2
 - Nieuw professioneel Supertiebreak-appicoon toegevoegd.
 - Android-iconen van 192 × 192 en 512 × 512 pixels vervangen.

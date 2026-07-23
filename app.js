@@ -31,6 +31,7 @@ const state = {
   archiveLocks: {},
   skippedDates: [],
   scoreWeights: {...DEFAULT_SCORE_WEIGHTS},
+  forbiddenPairs: [],
   defaultCourts: [5,6,9,10],
   currentMessage: "",
   pendingImport: [],
@@ -626,6 +627,7 @@ function makeRoundCandidate(players, courts, history, previousRound=null, weight
   for(let i=0;i<courts.length;i++){
     const group=shuffled.slice(i*4,i*4+4);
     if(group.length<4) return null;
+    if(courtHasForbiddenPair(group.map(p=>p.id))) return null;
     let best=null;
     allPairings(group).forEach(pairing=>{
       const pairingScore=scoreMatch(pairing,history,previous.pairKeys,previous.fourKeys,weights);
@@ -771,6 +773,22 @@ function teamText(team){return team.map(id=>displayName(playerById(id))).join(" 
 function pairKey(a,b){return [a,b].sort().join("|")}
 function fourKey(ids){return [...ids].sort().join("|")}
 
+function isForbiddenPair(a,b) {
+  if (!a || !b || a===b) return false;
+  const key=pairKey(a,b);
+  return state.forbiddenPairs.some(item=>pairKey(item.a,item.b)===key);
+}
+
+function courtHasForbiddenPair(ids) {
+  const clean=(ids||[]).filter(Boolean);
+  for(let i=0;i<clean.length;i++){
+    for(let j=i+1;j<clean.length;j++){
+      if(isForbiddenPair(clean[i],clean[j])) return true;
+    }
+  }
+  return false;
+}
+
 function completedScheduleDates(excludeDate="") {
   return Object.keys(state.schedules)
     .filter(date=>date!==excludeDate && state.schedules[date]?.round1 && state.schedules[date]?.round2)
@@ -832,9 +850,7 @@ function scheduleHtml(schedule, settings, date) {
       <div class="vs-line">-</div>
       <div class="match-line team-line">${escapeHtml(teamText(c.team2))}</div>
     </div>`).join("")}</div></div>`;
-  const quality=schedule.quality || (schedule.mode==="automatic"?evaluateScheduleQuality(round1,round2,buildHistory("all",date)):null);
-  const qualityHtml=quality?`<div class="quality-card"><div class="quality-head"><div><strong>Indelingskwaliteit</strong><span>${schedule.examined?`Beste uit ${Number(schedule.examined).toLocaleString("nl-NL")} onderzochte indelingen`:"Beoordeling van deze indeling"}</span></div><div class="quality-score">${quality.total}/100</div></div><div class="quality-grid"><span>Ratingbalans <b>${quality.rating}%</b></span><span>Mixdubbels <b>${quality.mix}%</b></span><span>Nieuwe partners <b>${quality.partners}%</b></span><span>Nieuwe tegenstanders <b>${quality.opponents}%</b></span><span>Nieuwe viertallen <b>${quality.groups}%</b></span><span>Geen dubbel koppel <b>${quality.duplicatePairs}%</b></span></div></div>`:"";
-  return qualityHtml+renderRound("Supertie Ronde 1",round1)+renderRound("Supertie Ronde 2",round2);
+  return renderRound("Supertie Ronde 1",round1)+renderRound("Supertie Ronde 2",round2);
 }
 
 async function renderSchedule(date) {
@@ -1008,6 +1024,17 @@ function validateManualEditor() {
     });
 
     [1,2].forEach(roundNumber=>rounds[roundNumber].forEach(court=>{
+      if(courtHasForbiddenPair(court.players)) {
+        const conflicts=[];
+        for(let i=0;i<court.players.length;i++){
+          for(let j=i+1;j<court.players.length;j++){
+            if(isForbiddenPair(court.players[i],court.players[j])) {
+              conflicts.push(`${displayName(playerById(court.players[i]))} en ${displayName(playerById(court.players[j]))}`);
+            }
+          }
+        }
+        warnings.push(`Baan ${court.court}, ronde ${roundNumber}: niet-samen-combinatie: ${conflicts.join(", ")}.`);
+      }
       [court.team1,court.team2].forEach(team=>{
         const count=countWith(history.partnerCounts,team[0],team[1]);
         if(count>0) warnings.push(`${teamText(team)} speelde historisch al ${count}× samen.`);
@@ -1229,6 +1256,18 @@ async function buildMessage(type,date) {
       ...(incomplete.length?incomplete.map(p=>`- ${displayName(p)}: ${missingFields(p).join(", ")}`):["Alle gegevens zijn compleet."]),
       "",appText
     ].join("\n");
+  }
+
+  if (type==="cancel") {
+    const reason=($("cancellationReason")?.value||"").trim();
+    const lines=[
+      "🎾 Supertieavond afgelast","",
+      `Helaas gaat de Supertieavond van ${shortDate.toLowerCase()} niet door.`,""
+    ];
+    if(reason) lines.push(`Reden: ${reason}`);
+    else lines.push("Door onvoorziene omstandigheden is besloten de speelavond af te gelasten.");
+    lines.push("","We hopen jullie volgende week weer te zien!","","Groeten,","De organisatie TV Nieuw-Vennep");
+    return lines.join("\n");
   }
 
   if (type==="final") {
@@ -1501,32 +1540,54 @@ function renderStatistics() {
 }
 
 
-async function loadScoreWeights(){
-  const snap=await getDoc(doc(db,"settings","scoreWeights"));
-  state.scoreWeights={...DEFAULT_SCORE_WEIGHTS,...(snap.exists()?snap.data():{})};
-  renderScoreWeights();
+async function loadForbiddenPairs(){
+  const snap=await getDoc(doc(db,"settings","forbiddenPairs"));
+  const pairs=snap.exists()&&Array.isArray(snap.data().pairs)?snap.data().pairs:[];
+  const seen=new Set();
+  state.forbiddenPairs=pairs.filter(item=>item?.a&&item?.b&&item.a!==item.b).filter(item=>{
+    const key=pairKey(item.a,item.b);
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  renderForbiddenPairs();
 }
 
-function renderScoreWeights(){
-  Object.keys(DEFAULT_SCORE_WEIGHTS).forEach(key=>{const el=$("weight_"+key);if(el)el.value=String(state.scoreWeights[key]);});
+function renderForbiddenPairs(){
+  const first=$("forbiddenPlayer1"),second=$("forbiddenPlayer2"),list=$("forbiddenPairsList");
+  if(!first||!second||!list) return;
+  const current1=first.value,current2=second.value;
+  const options='<option value="">Kies speler</option>'+state.players.map(p=>`<option value="${p.id}">${escapeHtml(displayName(p))}</option>`).join("");
+  first.innerHTML=options; second.innerHTML=options;
+  if(state.players.some(p=>p.id===current1)) first.value=current1;
+  if(state.players.some(p=>p.id===current2)) second.value=current2;
+  if(!state.forbiddenPairs.length){list.innerHTML="<p>Nog geen combinaties ingesteld.</p>";return;}
+  list.innerHTML=state.forbiddenPairs.map(item=>{
+    const a=playerById(item.a),b=playerById(item.b);
+    if(!a||!b) return "";
+    const key=pairKey(item.a,item.b);
+    return `<div class="archive-row"><div><strong>${escapeHtml(displayName(a))} ↔ ${escapeHtml(displayName(b))}</strong><div class="player-meta">Deze spelers komen niet op dezelfde baan.</div></div><button type="button" class="danger" data-remove-forbidden="${escapeHtml(key)}">Verwijderen</button></div>`;
+  }).join("")||"<p>Nog geen geldige combinaties ingesteld.</p>";
+  list.querySelectorAll("[data-remove-forbidden]").forEach(btn=>btn.onclick=()=>removeForbiddenPair(btn.dataset.removeForbidden));
 }
 
-async function saveScoreWeights(){
-  const next={};
-  for(const key of Object.keys(DEFAULT_SCORE_WEIGHTS)){
-    const value=Number($("weight_"+key)?.value);
-    if(!Number.isFinite(value)||value<0||value>100){showMessage($("scoreWeightsMessage"),"Gebruik waarden tussen 0 en 100.","error");return;}
-    next[key]=value;
-  }
-  state.scoreWeights=next;
-  await setDoc(doc(db,"settings","scoreWeights"),{...next,updatedAt:serverTimestamp()},{merge:true});
-  showMessage($("scoreWeightsMessage"),"Wegingen opgeslagen. Ze worden gebruikt bij de volgende automatische indeling.","success");
+async function addForbiddenPair(){
+  const a=$("forbiddenPlayer1").value,b=$("forbiddenPlayer2").value;
+  if(!a||!b){showMessage($("forbiddenPairsMessage"),"Kies twee spelers.","error");return;}
+  if(a===b){showMessage($("forbiddenPairsMessage"),"Kies twee verschillende spelers.","error");return;}
+  if(isForbiddenPair(a,b)){showMessage($("forbiddenPairsMessage"),"Deze combinatie staat al in de lijst.","error");return;}
+  state.forbiddenPairs.push({a,b});
+  await setDoc(doc(db,"settings","forbiddenPairs"),{pairs:state.forbiddenPairs,updatedAt:serverTimestamp()},{merge:true});
+  $("forbiddenPlayer1").value=""; $("forbiddenPlayer2").value="";
+  renderForbiddenPairs();
+  showMessage($("forbiddenPairsMessage"),"Combinatie opgeslagen.","success");
 }
 
-function resetScoreWeights(){
-  state.scoreWeights={...DEFAULT_SCORE_WEIGHTS};
-  renderScoreWeights();
-  showMessage($("scoreWeightsMessage"),"Standaardwaarden ingevuld. Druk op Opslaan om ze te bewaren.","success");
+async function removeForbiddenPair(key){
+  state.forbiddenPairs=state.forbiddenPairs.filter(item=>pairKey(item.a,item.b)!==key);
+  await setDoc(doc(db,"settings","forbiddenPairs"),{pairs:state.forbiddenPairs,updatedAt:serverTimestamp()},{merge:true});
+  renderForbiddenPairs();
+  showMessage($("forbiddenPairsMessage"),"Combinatie verwijderd.","success");
 }
 
 async function changePin() {
@@ -1778,8 +1839,7 @@ function attachEvents() {
   $("statisticsPeriod").onchange=renderStatistics;
   $("statisticsPlayer").onchange=renderStatistics;
   $("changePin").onclick=changePin;
-  $("saveScoreWeights").onclick=saveScoreWeights;
-  $("resetScoreWeights").onclick=resetScoreWeights;
+  $("addForbiddenPair").onclick=addForbiddenPair;
   $("addNoPlayDate").onclick=addSkippedDate;
   $("saveDefaultCourts").onclick=saveDefaultCourts;
   $("archiveDateSelect").onchange=renderArchiveViewer;
@@ -1831,7 +1891,7 @@ function subscribeResponses() {
 async function init() {
   await loadSkippedDates();
   await loadDefaultCourts();
-  await loadScoreWeights();
+  await loadForbiddenPairs();
   state.dates=getOpenTuesdays();
   attachEvents();
   renderSkippedDates();
@@ -1848,6 +1908,7 @@ async function init() {
     if (memberMigrated) return;
     state.players=loadedPlayers.sort((a,b)=>(a.number??9999)-(b.number??9999));
     renderPlayerSelect();
+    renderForbiddenPairs();
     renderParticipantDates();
     if(state.organizerOpen){renderAdminPlayers();renderOrganizerEvening();renderSchedulePanel();renderStatistics();renderArchive()}
   });
