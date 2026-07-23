@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.0
+
+- De webapp is omgezet naar een installeerbare PWA.
+- Manifest, serviceworker en app-iconen toegevoegd.
+- Ondersteuning voor een snelkoppeling op Android, iPhone en iPad.
+- Nieuwe uitleg en installatieknop bij Organisator → Beheer.
+- De app opent vanaf het beginscherm vrijwel schermvullend.
+
 ## v2.0.3
 
 - Nieuwe knop **Aanmeldingen en indeling op nul** voor toekomstige speelavonden.

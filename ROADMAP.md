@@ -25,3 +25,10 @@
 - [x] Toekomstige testavond met één knop volledig op nul zetten.
 - [x] Aanmeldingen, selectie en indeling gezamenlijk verwijderen.
 - [x] Banen en overige speelavondinstellingen behouden.
+
+
+## Afgerond in v2.1.0
+
+- Installeerbare app voor Android, iPhone en iPad.
+- Eigen app-icoon en beginschermkoppeling.
+- PWA-manifest en serviceworker.

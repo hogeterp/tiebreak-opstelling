@@ -4,8 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#147a3e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Supertiebreak">
   <title>Supertiebreak-opstelling</title>
-  <link rel="stylesheet" href="style.css?v=2.0.2">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css?v=2.1.0">
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -18,7 +23,7 @@
   </a>
   <header class="topbar">
     <div>
-      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.0.3</span></div>
+      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.1.0</span></div>
       <p>Dinsdag 20:00–21:30</p>
     </div>
   </header>
@@ -240,7 +245,7 @@
           </details>
 
           <details class="card">
-            <summary>Nieuw in v2.0.3</summary>
+            <summary>Nieuw in v2.1.0</summary>
             <ul>
               <li>Speelavonden worden opgeslagen in een archief.</li>
               <li>De laatste speelavond blijft nog 7 dagen beschikbaar voor de organisator.</li>
@@ -275,6 +280,23 @@
               <button id="resetScoreWeights" class="secondary" type="button">Standaardwaarden</button>
             </div>
             <div id="scoreWeightsMessage" class="message hidden"></div>
+          </details>
+
+          <details class="card" open>
+            <summary>App op beginscherm</summary>
+            <p>Maak een snelkoppeling met eigen icoon, zodat de Supertiebreak direct opent als een app.</p>
+            <div class="install-grid">
+              <div class="install-panel">
+                <h3>Android</h3>
+                <p id="androidInstallText" class="muted">Tik op de knop hieronder. Verschijnt de knop niet, kies dan in het browsermenu <strong>Toevoegen aan startscherm</strong>.</p>
+                <button id="installAppButton" type="button" disabled>App installeren</button>
+              </div>
+              <div class="install-panel">
+                <h3>iPhone / iPad</h3>
+                <p class="muted">Open deze pagina in Safari, tik op het deel-icoon en kies <strong>Zet op beginscherm</strong>.</p>
+              </div>
+            </div>
+            <div id="installMessage" class="message hidden"></div>
           </details>
 
           <details class="card">
@@ -330,6 +352,7 @@
     </form>
   </dialog>
 
-  <script type="module" src="app.js?v=2.0.2"></script>
+  <script src="install.js?v=2.1.0" defer></script>
+  <script type="module" src="app.js?v=2.1.0"></script>
 </body>
 </html>

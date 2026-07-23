@@ -1,11 +1,13 @@
-# Supertiebreak-opstelling v2.0.3
+# Supertiebreak-opstelling v2.1.0
 
 Webapp voor de wekelijkse Supertiebreak bij TV Nieuw-Vennep.
 
-## Nieuw in v2.0.3
+## Nieuw in v2.1.0
 
-De organisator kan een toekomstige speelavond die voor een test is ingevuld met één knop volledig op nul zetten. Daarbij worden alle aanmeldingen, de deelnemersselectie en de indeling verwijderd. De datum, ingestelde banen en overige speelavondinstellingen blijven behouden, zodat iedereen opnieuw kan kiezen.
+De webapp kan nu op Android, iPhone en iPad als app-icoon op het beginscherm worden gezet.
 
-## Archief
+- Android: gebruik de knop **App installeren** bij Organisator → Beheer, of kies **Toevoegen aan startscherm** in het browsermenu.
+- iPhone/iPad: open de app in Safari, tik op **Deel** en kies **Zet op beginscherm**.
+- De app opent daarna in een vrijwel schermvullend venster met een eigen clubicoon.
 
-Na dinsdag 21:00 verdwijnt de gespeelde avond uit de actieve keuzelijsten. De avond blijft in het archief beschikbaar. Alleen de organisator kan hem ontgrendelen voor een correctie en daarna opnieuw vergrendelen.
+Alle functies uit v2.0.3 zijn behouden.

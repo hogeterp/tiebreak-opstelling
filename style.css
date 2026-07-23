@@ -253,3 +253,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #resetFutureEvening:disabled{opacity:.55;cursor:wait}
 .muted{color:var(--gray);font-size:.9rem;margin-bottom:0}
 @media (max-width:620px){#resetFutureEvening{width:100%;max-width:none}}
+
+/* v2.1.0 installeren als app */
+.install-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.install-panel{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff}
+.install-panel h3{margin:0 0 6px}
+.install-panel p{margin:0 0 12px}
+@media(max-width:640px){.install-grid{grid-template-columns:1fr}}
