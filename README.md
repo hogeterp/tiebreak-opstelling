@@ -1,18 +1,19 @@
-# Supertiebreak-opstelling v2.1.1
+# Supertiebreak-opstelling v2.1.2
 
 Webapp voor de wekelijkse Supertiebreak bij TV Nieuw-Vennep.
 
-## Nieuw in v2.1.1
+## Nieuw in v2.1.2
 
-De webapp kan nu op Android, iPhone en iPad als app-icoon op het beginscherm worden gezet.
-
-- Android: gebruik de knop **App installeren** bij Organisator → Beheer, of kies **Toevoegen aan startscherm** in het browsermenu.
-- iPhone/iPad: open de app in Safari, tik op **Deel** en kies **Zet op beginscherm**.
-- De app opent daarna in een vrijwel schermvullend venster met een eigen clubicoon.
-
-Alle functies uit v2.0.3 zijn behouden.
-
+- Nieuw professioneel appicoon met clublogo, tennisbal en de tekst **SUPERTIEBREAK**.
+- Nieuwe iconen voor Android, iPhone en iPad.
+- Alle functies uit v2.1.1 zijn behouden.
 
 ## Snelkoppeling installeren
-Android: open het browsermenu en kies **Toevoegen aan startscherm**. Installeer geen APK.
-iPhone/iPad: open in Safari en kies **Deel → Zet op beginscherm**.
+
+- **Android:** open de website in Chrome of Samsung Internet. Open het browsermenu en kies **Toevoegen aan startscherm**.
+- **iPhone/iPad:** open de website in Safari. Tik op **Deel** en kies **Zet op beginscherm**.
+- Installeer geen APK of onbekende app.
+
+## Nieuw icoon zichtbaar maken
+
+Staat het oude icoon nog op het beginscherm? Verwijder alleen de bestaande snelkoppeling en voeg de website daarna opnieuw toe. De gegevens in Firebase blijven behouden.

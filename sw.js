@@ -1,15 +1,16 @@
-const CACHE = 'supertiebreak-v2.1.1';
+const CACHE = 'supertiebreak-v2.1.2';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=2.1.1',
-  './app.js?v=2.1.1',
-  './install.js?v=2.1.1',
+  './style.css?v=2.1.2',
+  './app.js?v=2.1.2',
+  './install.js?v=2.1.2',
   './manifest.webmanifest',
   './club-logo.png',
   './icon-192.png',
   './icon-512.png',
-  './apple-touch-icon.png'
+  './apple-touch-icon.png',
+  './app-icon-source.png'
 ];
 
 self.addEventListener('install', event => {

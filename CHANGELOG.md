@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.1.2
+- Nieuw professioneel Supertiebreak-appicoon toegevoegd.
+- Android-iconen van 192 × 192 en 512 × 512 pixels vervangen.
+- Apple Touch Icon voor iPhone en iPad vervangen.
+- Icooncache vernieuwd zodat het nieuwe logo na opnieuw toevoegen aan het beginscherm wordt gebruikt.
+- Geen wijzigingen aan deelnemers, indelingen, archief of Firebase-gegevens.
+
 ## v2.1.1
 - De rechtstreekse Android-installatieprompt is verwijderd.
 - Android gebruikt nu uitsluitend de veilige browseroptie **Toevoegen aan startscherm**.
