@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.1
+- De rechtstreekse Android-installatieprompt is verwijderd.
+- Android gebruikt nu uitsluitend de veilige browseroptie **Toevoegen aan startscherm**.
+- Hierdoor wordt geen APK of onbekende app aangeboden en verschijnt Play Protect niet door de knop in de webapp.
+- Duidelijke stappen toegevoegd voor Chrome, Samsung Internet, iPhone en iPad.
+- Cacheversie bijgewerkt zodat de wijziging direct wordt geladen.
+
+# Changelog
+
 ## v2.1.0
 
 - De webapp is omgezet naar een installeerbare PWA.

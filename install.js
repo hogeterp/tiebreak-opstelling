@@ -1,39 +1,16 @@
 (() => {
-  let deferredPrompt = null;
-
-  function showMessage(text, kind = 'success') {
+  function showMessage(text, kind = 'info') {
     const box = document.getElementById('installMessage');
     if (!box) return;
     box.textContent = text;
     box.className = `message ${kind}`;
   }
 
-  window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault();
-    deferredPrompt = event;
-    const button = document.getElementById('installAppButton');
-    if (button) button.disabled = false;
-  });
-
-  window.addEventListener('appinstalled', () => {
-    deferredPrompt = null;
-    const button = document.getElementById('installAppButton');
-    if (button) button.disabled = true;
-    showMessage('De Supertiebreak-app staat nu op het beginscherm.');
-  });
-
   document.addEventListener('DOMContentLoaded', () => {
-    const button = document.getElementById('installAppButton');
-    if (button) {
-      button.addEventListener('click', async () => {
-        if (!deferredPrompt) {
-          showMessage('Open het browsermenu en kies “Toevoegen aan startscherm”. Op iPhone gebruik je Safari → Deel → Zet op beginscherm.', 'info');
-          return;
-        }
-        deferredPrompt.prompt();
-        await deferredPrompt.userChoice;
-        deferredPrompt = null;
-        button.disabled = true;
+    const helpButton = document.getElementById('showAndroidInstallHelp');
+    if (helpButton) {
+      helpButton.addEventListener('click', () => {
+        showMessage('Gebruik het menu van je browser en kies “Toevoegen aan startscherm”. Kies niet voor het installeren van een APK of onbekende app.', 'info');
       });
     }
 

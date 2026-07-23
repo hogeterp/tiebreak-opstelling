@@ -260,3 +260,5 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .install-panel h3{margin:0 0 6px}
 .install-panel p{margin:0 0 12px}
 @media(max-width:640px){.install-grid{grid-template-columns:1fr}}
+
+.install-steps{margin:10px 0 14px;padding-left:22px}.install-steps li{margin:7px 0;line-height:1.35}

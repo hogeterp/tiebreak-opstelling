@@ -10,7 +10,7 @@
   <title>Supertiebreak-opstelling</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=2.1.0">
+  <link rel="stylesheet" href="style.css?v=2.1.1">
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -23,7 +23,7 @@
   </a>
   <header class="topbar">
     <div>
-      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.1.0</span></div>
+      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.1.1</span></div>
       <p>Dinsdag 20:00–21:30</p>
     </div>
   </header>
@@ -283,17 +283,27 @@
           </details>
 
           <details class="card" open>
-            <summary>App op beginscherm</summary>
-            <p>Maak een snelkoppeling met eigen icoon, zodat de Supertiebreak direct opent als een app.</p>
+            <summary>Snelkoppeling op beginscherm</summary>
+            <p>Zet de Supertiebreak veilig op het beginscherm. Er wordt geen los appbestand of APK geïnstalleerd.</p>
             <div class="install-grid">
               <div class="install-panel">
                 <h3>Android</h3>
-                <p id="androidInstallText" class="muted">Tik op de knop hieronder. Verschijnt de knop niet, kies dan in het browsermenu <strong>Toevoegen aan startscherm</strong>.</p>
-                <button id="installAppButton" type="button" disabled>App installeren</button>
+                <ol class="install-steps">
+                  <li>Open deze pagina in Chrome of Samsung Internet.</li>
+                  <li>Tik rechtsboven of rechtsonder op het browsermenu <strong>⋮</strong>.</li>
+                  <li>Kies <strong>Toevoegen aan startscherm</strong> of <strong>Pagina toevoegen aan → Startscherm</strong>.</li>
+                  <li>Bevestig met <strong>Toevoegen</strong>.</li>
+                </ol>
+                <button id="showAndroidInstallHelp" type="button">Toon Android-uitleg</button>
               </div>
               <div class="install-panel">
                 <h3>iPhone / iPad</h3>
-                <p class="muted">Open deze pagina in Safari, tik op het deel-icoon en kies <strong>Zet op beginscherm</strong>.</p>
+                <ol class="install-steps">
+                  <li>Open deze pagina in Safari.</li>
+                  <li>Tik op het deel-icoon.</li>
+                  <li>Kies <strong>Zet op beginscherm</strong>.</li>
+                  <li>Tik op <strong>Voeg toe</strong>.</li>
+                </ol>
               </div>
             </div>
             <div id="installMessage" class="message hidden"></div>
@@ -352,7 +362,7 @@
     </form>
   </dialog>
 
-  <script src="install.js?v=2.1.0" defer></script>
-  <script type="module" src="app.js?v=2.1.0"></script>
+  <script src="install.js?v=2.1.1" defer></script>
+  <script type="module" src="app.js?v=2.1.1"></script>
 </body>
 </html>

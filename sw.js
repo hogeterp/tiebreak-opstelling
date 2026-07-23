@@ -1,10 +1,10 @@
-const CACHE = 'supertiebreak-v2.1.0';
+const CACHE = 'supertiebreak-v2.1.1';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=2.1.0',
-  './app.js?v=2.1.0',
-  './install.js?v=2.1.0',
+  './style.css?v=2.1.1',
+  './app.js?v=2.1.1',
+  './install.js?v=2.1.1',
   './manifest.webmanifest',
   './club-logo.png',
   './icon-192.png',

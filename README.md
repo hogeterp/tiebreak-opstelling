@@ -1,8 +1,8 @@
-# Supertiebreak-opstelling v2.1.0
+# Supertiebreak-opstelling v2.1.1
 
 Webapp voor de wekelijkse Supertiebreak bij TV Nieuw-Vennep.
 
-## Nieuw in v2.1.0
+## Nieuw in v2.1.1
 
 De webapp kan nu op Android, iPhone en iPad als app-icoon op het beginscherm worden gezet.
 
@@ -11,3 +11,8 @@ De webapp kan nu op Android, iPhone en iPad als app-icoon op het beginscherm wor
 - De app opent daarna in een vrijwel schermvullend venster met een eigen clubicoon.
 
 Alle functies uit v2.0.3 zijn behouden.
+
+
+## Snelkoppeling installeren
+Android: open het browsermenu en kies **Toevoegen aan startscherm**. Installeer geen APK.
+iPhone/iPad: open in Safari en kies **Deel → Zet op beginscherm**.
