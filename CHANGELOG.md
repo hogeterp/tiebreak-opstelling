@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.3
+
+- Nieuwe knop **Aanmeldingen en indeling op nul** voor toekomstige speelavonden.
+- De knop verwijdert alle Ja/Misschien/Nee-keuzes, de spelersselectie en beide indelingsrondes.
+- Datum, banen en speelavondinstellingen blijven behouden.
+- Extra bevestiging voorkomt dat een speelavond per ongeluk wordt leeggemaakt.
+- Alleen toekomstige, bewerkbare speelavonden kunnen worden gereset.
+
 ## v2.0.2
 
 - Speelavonden die voorbij zijn, staan vanaf dinsdag 21:00 alleen nog in het archief.

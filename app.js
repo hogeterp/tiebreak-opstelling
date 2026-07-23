@@ -483,6 +483,69 @@ async function saveSelectionEditor() {
   renderSelectionSummary(date);
 }
 
+async function resetFutureEvening() {
+  const date = $("orgDateSelect").value;
+  if (!date) return;
+  if (!assertEditable(date)) return;
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const eveningDate = parseLocalDate(date);
+  eveningDate.setHours(0,0,0,0);
+  if (eveningDate <= today) {
+    showMessage($("resetFutureMessage"), "Alleen een datum in de toekomst kan op nul worden gezet.", "error");
+    return;
+  }
+
+  const label = capitalize(formatDate(date));
+  const confirmed = confirm(
+    `Weet je zeker dat je ${label} volledig op nul wilt zetten?\n\n` +
+    "Alle Ja/Misschien/Nee-keuzes, de spelersselectie en beide indelingsrondes worden verwijderd. " +
+    "De datum, banen en overige speelavondinstellingen blijven staan. Dit kan niet ongedaan worden gemaakt."
+  );
+  if (!confirmed) return;
+
+  const button = $("resetFutureEvening");
+  button.disabled = true;
+  hideMessage($("resetFutureMessage"));
+
+  try {
+    const responsesSnap = await getDocs(collection(db,"playingDates",date,"responses"));
+    const batch = writeBatch(db);
+    responsesSnap.forEach(item => batch.delete(item.ref));
+    await batch.commit();
+
+    await Promise.all([
+      deleteDoc(doc(db,"selections",date)),
+      deleteDoc(doc(db,"schedules",date)),
+      deleteDoc(doc(db,"learningSchedules",date)),
+      deleteDoc(doc(db,"eveningArchive",date))
+    ]);
+
+    state.responses[date] = {};
+    delete state.selections[date];
+    delete state.schedules[date];
+    state.archiveDates = state.archiveDates.filter(d => d !== date);
+    delete state.archiveLocks[date];
+
+    renderDashboard(date);
+    renderOrganizerStatuses(date);
+    if ($("scheduleDateSelect").value === date) {
+      renderSelectionSummary(date);
+      renderSchedule(date);
+    }
+    renderParticipantDates();
+    renderArchive();
+    await logAction("toekomstige_speelavond_gereset", { date });
+    showMessage($("resetFutureMessage"), `${label} staat weer volledig op nul. Iedereen kan opnieuw kiezen.`, "success");
+  } catch (error) {
+    console.error("Speelavond resetten mislukt:", error);
+    showMessage($("resetFutureMessage"), `Resetten mislukt: ${error.message || "onbekende fout"}`, "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function shuffleCopy(items) {
   const copy=[...items];
   for(let i=copy.length-1;i>0;i--){
@@ -1699,6 +1762,7 @@ function attachEvents() {
   $("autoSelection").onclick=()=>automaticSelection($("scheduleDateSelect").value);
   $("manualSelection").onclick=()=>openSelectionEditor($("scheduleDateSelect").value);
   $("saveSelection").onclick=saveSelectionEditor;
+  $("resetFutureEvening").onclick=resetFutureEvening;
   $("autoSchedule").onclick=()=>automaticSchedule($("scheduleDateSelect").value);
   $("manualSchedule").onclick=()=>openManualEditor($("scheduleDateSelect").value);
   $("saveManualSchedule").onclick=saveManualSchedule;

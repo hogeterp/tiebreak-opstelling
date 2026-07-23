@@ -246,3 +246,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .lock-badge.unlocked{background:#fff4d6;color:#6f4d00;border:1px solid #e5c66d}
 .archive-schedule{margin-top:12px}
 #org-archive .action-row{margin-top:10px}
+
+
+/* v2.0.3 toekomstige speelavond resetten */
+#resetFutureEvening{max-width:290px}
+#resetFutureEvening:disabled{opacity:.55;cursor:wait}
+.muted{color:var(--gray);font-size:.9rem;margin-bottom:0}
+@media (max-width:620px){#resetFutureEvening{width:100%;max-width:none}}

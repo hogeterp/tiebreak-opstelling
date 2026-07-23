@@ -18,3 +18,10 @@
 - [x] Automatisch scheiden van actieve en gespeelde avonden vanaf dinsdag 21:00
 - [x] Archief standaard alleen-lezen
 - [x] Ontgrendelen en opnieuw vergrendelen door organisator
+
+
+## Afgerond in v2.0.3
+
+- [x] Toekomstige testavond met één knop volledig op nul zetten.
+- [x] Aanmeldingen, selectie en indeling gezamenlijk verwijderen.
+- [x] Banen en overige speelavondinstellingen behouden.

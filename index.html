@@ -18,7 +18,7 @@
   </a>
   <header class="topbar">
     <div>
-      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.0.2</span></div>
+      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.0.3</span></div>
       <p>Dinsdag 20:00–21:30</p>
     </div>
   </header>
@@ -93,7 +93,14 @@
           </div>
 
           <div class="card">
-            <h2>Aanmeldingen aanpassen</h2>
+            <div class="row between wrap">
+              <div>
+                <h2>Aanmeldingen aanpassen</h2>
+                <p class="muted">Gebruik de resetknop alleen voor een toekomstige testavond. De banen en datum blijven staan.</p>
+              </div>
+              <button id="resetFutureEvening" class="danger" type="button">Aanmeldingen en indeling op nul</button>
+            </div>
+            <div id="resetFutureMessage" class="message hidden"></div>
             <div id="organizerStatuses" class="status-list"></div>
           </div>
         </section>
@@ -233,7 +240,7 @@
           </details>
 
           <details class="card">
-            <summary>Nieuw in v2.0.2</summary>
+            <summary>Nieuw in v2.0.3</summary>
             <ul>
               <li>Speelavonden worden opgeslagen in een archief.</li>
               <li>De laatste speelavond blijft nog 7 dagen beschikbaar voor de organisator.</li>

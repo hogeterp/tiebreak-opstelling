@@ -1,9 +1,11 @@
-# Supertiebreak-opstelling v2.0.2
+# Supertiebreak-opstelling v2.0.3
 
 Webapp voor de wekelijkse Supertiebreak bij TV Nieuw-Vennep.
 
-Versie 2.0.1 bevat een bugfix voor overgeslagen speeldata en een nieuwe instelling voor standaardbanen. Banen 5, 6, 9 en 10 zijn als standaard ingesteld en kunnen door de organisator worden aangepast.
+## Nieuw in v2.0.3
 
+De organisator kan een toekomstige speelavond die voor een test is ingevuld met één knop volledig op nul zetten. Daarbij worden alle aanmeldingen, de deelnemersselectie en de indeling verwijderd. De datum, ingestelde banen en overige speelavondinstellingen blijven behouden, zodat iedereen opnieuw kan kiezen.
 
-## Archief in v2.0.2
+## Archief
+
 Na dinsdag 21:00 verdwijnt de gespeelde avond uit de actieve keuzelijsten. De avond blijft in het archief beschikbaar. Alleen de organisator kan hem ontgrendelen voor een correctie en daarna opnieuw vergrendelen.
