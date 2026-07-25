@@ -1,15 +1,17 @@
-const CACHE = 'supertiebreak-v2.2.0';
+const CACHE = 'supertiebreak-v2.2.1';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=2.1.2',
-  './app.js?v=2.1.2',
-  './install.js?v=2.1.2',
-  './manifest.webmanifest',
+  './style.css?v=2.2.1',
+  './app.js?v=2.2.1',
+  './install.js?v=2.2.1',
+  './manifest.webmanifest?v=2.2.1',
   './club-logo.png',
-  './icon-192.png',
-  './icon-512.png',
-  './apple-touch-icon.png',
+  './icon-192-v221.png',
+  './icon-512-v221.png',
+  './icon-maskable-192-v221.png',
+  './icon-maskable-512-v221.png',
+  './apple-touch-icon-v221.png',
   './app-icon-source.png'
 ];
 

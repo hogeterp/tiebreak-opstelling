@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.1
+- App-iconen kregen nieuwe bestandsnamen, zodat Android niet langer een oud icoon uit de cache gebruikt.
+- Aparte veilige maskable-iconen toegevoegd met extra ruimte rondom het logo.
+- Hierdoor blijft de tekst SUPERTIEBREAK binnen de afgeronde Android-vorm zichtbaar.
+- Manifest, Apple Touch Icon, serviceworker en alle cacheverwijzingen bijgewerkt.
+- Geen wijzigingen aan deelnemers, indelingen, WhatsApp-berichten of Firebase-gegevens.
+
 ## v2.2.0
 - Nieuwe beheerfunctie **Niet samen op één baan** toegevoegd.
 - De automatische indeling zet ingestelde spelers nooit op dezelfde baan.

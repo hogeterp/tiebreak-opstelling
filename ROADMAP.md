@@ -1,6 +1,6 @@
 # Roadmap
 
-## v2.2.0 — gereed
+## v2.2.1 — gereed
 - Nieuw professioneel appicoon voor Android, iPhone en iPad.
 
 Supertiebreak-opstelling
