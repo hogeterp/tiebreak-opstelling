@@ -1299,7 +1299,7 @@ async function enablePushNotifications(){
     const settings=await notificationSettings();
     const vapidKey=String(settings.vapidKey||"").trim();
     if(!vapidKey) throw new Error("De Firebase VAPID-sleutel moet eerst éénmalig worden ingevuld.");
-    const registration=await navigator.serviceWorker.register("./firebase-messaging-sw.js?v=2.3.1");
+    const registration=await navigator.serviceWorker.register("./firebase-messaging-sw.js?v=2.3.2");
     const token=await getToken(messaging,{vapidKey,serviceWorkerRegistration:registration});
     if(!token) throw new Error("Er kon geen meldingstoken worden gemaakt.");
     await setDoc(doc(db,"notificationDevices",deviceId()),{token,enabled:true,userAgent:navigator.userAgent,updatedAt:serverTimestamp()},{merge:true});

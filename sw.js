@@ -1,4 +1,4 @@
-const CACHE = 'supertiebreak-v2.3.1';
+const CACHE = 'supertiebreak-v2.3.2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -13,7 +13,7 @@ const APP_SHELL = [
   './icon-maskable-512-v221.png',
   './apple-touch-icon-v221.png',
   './app-icon-source.png',
-  './firebase-messaging-sw.js?v=2.3.1'
+  './firebase-messaging-sw.js?v=2.3.2'
 ];
 
 self.addEventListener('install', event => {

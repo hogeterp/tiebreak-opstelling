@@ -1,12 +1,13 @@
-EENMALIGE INSTELLING VOOR PUSHMELDINGEN
+PUSHMELDINGEN – VERSIE 2.3.2
 
-1. Open Firebase Console > Project tiebreak-opstelling.
-2. Ga naar Projectinstellingen > Cloud Messaging > Web Push certificates.
-3. Maak een sleutelpaar en kopieer de openbare VAPID-sleutel.
+De gewone webapp kan zonder map functions naar GitHub worden geüpload.
+
+IN DE APP:
+1. Open Firebase Console > Projectinstellingen > Cloud Messaging.
+2. Maak bij Web Push-certificaten een sleutelpaar.
+3. Kopieer de openbare VAPID-sleutel.
 4. Open de webapp als organisator > Beheer > Pushmeldingen.
-5. Plak de VAPID-sleutel en sla hem op.
-6. Installeer Firebase CLI op een computer, log in en voer in deze projectmap uit:
-   firebase deploy --only functions
-7. Open de webapp op Carels telefoon en druk op Meldingen inschakelen.
+5. Plak de VAPID-sleutel, sla hem op en druk op Meldingen inschakelen.
 
-Let op: GitHub Pages host alleen de webapp. De map functions moet apart naar Firebase worden gedeployed.
+EENMALIGE TECHNISCHE STAP:
+Voor het werkelijk versturen van een melding moet de Firebase Cloud Function één keer apart naar Firebase worden gepubliceerd. Gebruik daarvoor het aparte pakket Firebase-push-backend-v2.3.2.zip. Deze bestanden hoeven niet naar GitHub Pages.

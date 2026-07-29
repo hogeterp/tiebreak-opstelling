@@ -2,7 +2,7 @@
   "name": "Supertiebreak-opstelling TV Nieuw-Vennep",
   "short_name": "Supertiebreak",
   "description": "Aanmelden en indelen voor de wekelijkse Supertiebreak van TV Nieuw-Vennep.",
-  "start_url": "./?v=2.3.1",
+  "start_url": "./?v=2.3.2",
   "scope": "./",
   "id": "./supertiebreak-v230",
   "display": "standalone",

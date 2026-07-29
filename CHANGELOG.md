@@ -1,5 +1,14 @@
 # Wijzigingen
 
+## v2.3.2
+
+- De gewone GitHub-upload bevat geen map `functions` meer.
+- Alle bestanden voor GitHub Pages staan nu los in de hoofdmap en zijn daardoor eenvoudig vanaf een telefoon te selecteren.
+- De pushfunctie in de webapp is behouden.
+- De Firebase Cloud Function blijft een eenmalige, aparte installatie en hoeft niet in GitHub Pages te staan.
+- De aanmeldvolgorde uit v2.3.1 is volledig behouden.
+- Cache- en versieverwijzingen bijgewerkt naar v2.3.2.
+
 ## v2.3.1
 
 - Aangemelde spelers krijgen automatisch een vast aanmeldnummer op basis van hun eerste ja-aanmelding.
