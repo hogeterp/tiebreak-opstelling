@@ -1,13 +1,13 @@
-# Supertiebreak-opstelling v2.3.2
+# Supertiebreak-opstelling v2.3.3
 
 Webapp voor de wekelijkse Supertiebreak bij TV Nieuw-Vennep.
 
-## Nieuw in v2.3.2
+## Nieuw in v2.3.3
 
-- De gewone GitHub-upload bevat alleen losse webappbestanden.
-- Je hoeft op GitHub geen map `functions` meer te maken.
+- Pushmeldingen blijven automatisch ingeschakeld wanneer de browsertoestemming nog geldig is.
+- De pushregistratie wordt bij het openen automatisch gecontroleerd en vernieuwd.
+- De PWA-cache en Firebase Messaging gebruiken nu samen één serviceworker.
 - De aanmeldvolgorde met nummer 1, 2, 3 enzovoort blijft behouden.
-- De pushfunctie in de webapp blijft aanwezig.
 
 ## Belangrijk bij pushmeldingen
 

@@ -19,6 +19,7 @@ const db = getFirestore(app);
 let messaging = null;
 try { messaging = getMessaging(app); } catch (_) {}
 const APP_URL = "https://hogeterp.github.io/tiebreak-opstelling/";
+const PUSH_SW_URL = "./sw.js?v=2.3.3";
 
 const DEFAULT_SCORE_WEIGHTS = { rating:40, spread:2, mix:20, partner:20, opponent:6, four:10 };
 
@@ -248,6 +249,7 @@ async function renderOrganizerGate() {
     $("pinGate").classList.add("hidden");
     $("organizerApp").classList.remove("hidden");
     renderOrganizerEvening();
+    updatePushStatus().catch(error=>console.warn("Pushstatus kon niet worden bijgewerkt:",error));
     return;
   }
   $("organizerApp").classList.add("hidden");
@@ -1290,6 +1292,20 @@ async function notificationSettings(){
   return snap.exists()?snap.data():{};
 }
 
+async function createOrRefreshPushToken(vapidKey){
+  const registration=await navigator.serviceWorker.register(PUSH_SW_URL);
+  const token=await getToken(messaging,{vapidKey,serviceWorkerRegistration:registration});
+  if(!token) throw new Error("Er kon geen meldingstoken worden gemaakt.");
+  await setDoc(doc(db,"notificationDevices",deviceId()),{
+    token,
+    enabled:true,
+    userAgent:navigator.userAgent,
+    updatedAt:serverTimestamp()
+  },{merge:true});
+  localStorage.setItem("supertiePushToken",token);
+  return token;
+}
+
 async function enablePushNotifications(){
   const message=$("pushMessage");
   try{
@@ -1299,13 +1315,9 @@ async function enablePushNotifications(){
     const settings=await notificationSettings();
     const vapidKey=String(settings.vapidKey||"").trim();
     if(!vapidKey) throw new Error("De Firebase VAPID-sleutel moet eerst éénmalig worden ingevuld.");
-    const registration=await navigator.serviceWorker.register("./firebase-messaging-sw.js?v=2.3.2");
-    const token=await getToken(messaging,{vapidKey,serviceWorkerRegistration:registration});
-    if(!token) throw new Error("Er kon geen meldingstoken worden gemaakt.");
-    await setDoc(doc(db,"notificationDevices",deviceId()),{token,enabled:true,userAgent:navigator.userAgent,updatedAt:serverTimestamp()},{merge:true});
-    localStorage.setItem("supertiePushToken",token);
+    await createOrRefreshPushToken(vapidKey);
     showMessage(message,"Pushmeldingen staan aan op dit apparaat.","success");
-    updatePushStatus();
+    await updatePushStatus();
   }catch(error){ showMessage(message,error.message||"Pushmeldingen inschakelen is mislukt.","error"); }
 }
 
@@ -1326,14 +1338,26 @@ async function saveVapidKey(){
   if(!key){ showMessage($("pushMessage"),"Vul eerst de VAPID-sleutel in.","error"); return; }
   await setDoc(doc(db,"settings","notifications"),{vapidKey:key,updatedAt:serverTimestamp()},{merge:true});
   showMessage($("pushMessage"),"VAPID-sleutel opgeslagen.","success");
+  await updatePushStatus();
 }
 
 async function updatePushStatus(){
   if(!$("pushStatus")) return;
-  const enabled=Boolean(localStorage.getItem("supertiePushToken"));
-  $("pushStatus").textContent=enabled?"Aan op dit apparaat":"Uit op dit apparaat";
   const settings=await notificationSettings();
-  $("vapidKey").value=settings.vapidKey||"";
+  const vapidKey=String(settings.vapidKey||"").trim();
+  $("vapidKey").value=vapidKey;
+
+  let enabled=false;
+  if(messaging && vapidKey && "Notification" in window && Notification.permission==="granted" && "serviceWorker" in navigator){
+    try{
+      await createOrRefreshPushToken(vapidKey);
+      enabled=true;
+    }catch(error){
+      console.warn("Pushregistratie kon niet automatisch worden vernieuwd:",error);
+      enabled=Boolean(localStorage.getItem("supertiePushToken"));
+    }
+  }
+  $("pushStatus").textContent=enabled?"Aan op dit apparaat":"Uit op dit apparaat";
 }
 
 async function registerUrgentSignup(date,playerId,oldStatus,newStatus,source){
@@ -2068,6 +2092,7 @@ async function init() {
   await loadForbiddenPairs();
   state.dates=getOpenTuesdays();
   attachEvents();
+  await updatePushStatus().catch(error=>console.warn("Pushstatus kon niet worden bijgewerkt:",error));
   renderSkippedDates();
   renderDefaultCourtPicker();
   await loadArchiveData();

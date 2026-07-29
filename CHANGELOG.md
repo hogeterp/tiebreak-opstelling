@@ -1,5 +1,15 @@
 # Wijzigingen
 
+## v2.3.3
+
+- Pushstatus wordt bij het openen van de app automatisch opnieuw gecontroleerd.
+- Een geldige Firebase-token wordt automatisch vernieuwd en opnieuw opgeslagen.
+- De VAPID-sleutel wordt opnieuw uit Firestore geladen, zodat het veld niet meer onterecht leeg lijkt.
+- De gewone PWA-serviceworker en Firebase Messaging zijn samengevoegd tot één serviceworker.
+- Hiermee wordt voorkomen dat twee serviceworkers elkaar vervangen.
+- Manifest-verwijzingen naar de appiconen gecorrigeerd.
+- Cache- en versieverwijzingen bijgewerkt naar v2.3.3.
+
 ## v2.3.2
 
 - De gewone GitHub-upload bevat geen map `functions` meer.

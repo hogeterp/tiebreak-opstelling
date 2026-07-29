@@ -1,19 +1,50 @@
-const CACHE = 'supertiebreak-v2.3.2';
+importScripts('https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.0.0/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: 'AIzaSyBIG5j_8pHr5C1KlFuG6lG0WunlUR8EJFs',
+  authDomain: 'tiebreak-opstelling.firebaseapp.com',
+  projectId: 'tiebreak-opstelling',
+  storageBucket: 'tiebreak-opstelling.firebasestorage.app',
+  messagingSenderId: '363554771251',
+  appId: '1:363554771251:web:811ab3b99099fe4b1dee46'
+});
+
+const messaging=firebase.messaging();
+messaging.onBackgroundMessage(payload=>{
+  const title=payload.notification?.title||'Supertiebreak';
+  const options={
+    body:payload.notification?.body||'Nieuwe aanmelding.',
+    icon:'./icon-192-v221.png',
+    badge:'./icon-192-v221.png',
+    data:{url:'./'}
+  };
+  self.registration.showNotification(title,options);
+});
+
+self.addEventListener('notificationclick',event=>{
+  event.notification.close();
+  event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{
+    for(const client of list){ if('focus' in client) return client.focus(); }
+    return clients.openWindow('./');
+  }));
+});
+
+const CACHE = 'supertiebreak-v2.3.3';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=2.2.1',
-  './app.js?v=2.2.1',
-  './install.js?v=2.2.1',
-  './manifest.webmanifest?v=2.2.1',
+  './style.css?v=2.3.3',
+  './app.js?v=2.3.3',
+  './install.js?v=2.3.3',
+  './manifest.webmanifest?v=2.3.3',
   './club-logo.png',
   './icon-192-v221.png',
   './icon-512-v221.png',
   './icon-maskable-192-v221.png',
   './icon-maskable-512-v221.png',
   './apple-touch-icon-v221.png',
-  './app-icon-source.png',
-  './firebase-messaging-sw.js?v=2.3.2'
+  './app-icon-source.png'
 ];
 
 self.addEventListener('install', event => {

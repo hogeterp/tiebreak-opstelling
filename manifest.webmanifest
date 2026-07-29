@@ -2,7 +2,7 @@
   "name": "Supertiebreak-opstelling TV Nieuw-Vennep",
   "short_name": "Supertiebreak",
   "description": "Aanmelden en indelen voor de wekelijkse Supertiebreak van TV Nieuw-Vennep.",
-  "start_url": "./?v=2.3.2",
+  "start_url": "./?v=2.3.3",
   "scope": "./",
   "id": "./supertiebreak-v230",
   "display": "standalone",
@@ -11,25 +11,25 @@
   "lang": "nl-NL",
   "icons": [
     {
-      "src": "icon-192-v230.png",
+      "src": "icon-192-v221.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon-512-v230.png",
+      "src": "icon-512-v221.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon-maskable-192-v230.png",
+      "src": "icon-maskable-192-v221.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "icon-maskable-512-v230.png",
+      "src": "icon-maskable-512-v221.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
