@@ -1,4 +1,22 @@
+# Wijzigingen
+
+## v2.3.1
+
+- Aangemelde spelers krijgen automatisch een vast aanmeldnummer op basis van hun eerste ja-aanmelding.
+- De aanmeldvolgorde is zichtbaar voor deelnemers én in het organisatorscherm.
+- Aangemelde spelers worden in die volgorde getoond, zodat snel duidelijk is wie als eerste was bij overinschrijving.
+- Een bestaand aanmeldnummer blijft bewaard wanneer iemand later op misschien of nee drukt.
+- Cache- en versieverwijzingen bijgewerkt naar v2.3.1.
+
 # Changelog
+
+## v2.3.0
+- **Dringend speler gezocht** start voortaan een actieve dringende oproep.
+- De organisator kan de dringende oproep handmatig beëindigen.
+- Een speler die zich tijdens een actieve oproep op **Ja** zet, maakt automatisch een melding aan.
+- Pushmeldingen kunnen per apparaat worden in- en uitgeschakeld.
+- Firebase Cloud Messaging en een Cloud Function sturen de melding naar ingeschakelde organisator-apparaten.
+- Cache- en versieverwijzingen bijgewerkt naar v2.3.0.
 
 ## v2.2.1
 - App-iconen kregen nieuwe bestandsnamen, zodat Android niet langer een oud icoon uit de cache gebruikt.

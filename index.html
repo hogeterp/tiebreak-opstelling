@@ -23,7 +23,7 @@
   </a>
   <header class="topbar">
     <div>
-      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.2.1</span></div>
+      <div class="title-row"><h1>🎾 Supertiebreak-opstelling</h1><span id="versionBadge" class="version-badge">v2.3.1</span></div>
       <p>Dinsdag 20:00–21:30</p>
     </div>
   </header>
@@ -143,10 +143,14 @@
             <div class="whatsapp-grid">
               <button data-message="invite" type="button">Uitnodiging</button>
               <button data-message="spots" type="button">Nog plekken vrij</button>
-              <button data-message="urgent" type="button">Dringend invaller</button>
+              <button data-message="urgent" type="button">Dringend speler gezocht</button>
               <button data-message="reminder" type="button">Nog niet gereageerd</button>
               <button data-message="final" type="button">Definitieve indeling</button>
               <button data-message="incomplete" type="button">Gegevens aanvullen</button>
+            </div>
+            <div id="urgentCallStatus"></div>
+            <div class="action-row">
+              <button id="closeUrgentCall" class="danger hidden" type="button">Dringende oproep beëindigen</button>
             </div>
             <hr>
             <h3>Speelavond afgelasten</h3>
@@ -264,7 +268,8 @@
           </details>
 
           <details class="card">
-            <summary>Nieuw in v2.2.1</summary>
+            <summary>Nieuw in v2.3.1</summary>
+              <p><strong>Aanmeldvolgorde:</strong> bij aangemelde spelers staat nu automatisch wie nummer 1, 2, 3 enzovoort is. Zo is direct duidelijk wie zich het eerst heeft aangemeld als er te veel spelers zijn.</p>
             <ul>
               <li>Speelavonden worden opgeslagen in een archief.</li>
               <li>De laatste speelavond blijft nog 7 dagen beschikbaar voor de organisator.</li>
@@ -310,6 +315,23 @@
               </div>
             </div>
             <div id="installMessage" class="message hidden"></div>
+          </details>
+
+          <details class="card" open>
+            <summary>Pushmeldingen</summary>
+            <p>Ontvang op dit apparaat een melding als iemand zich aanmeldt terwijl een dringende oproep actief is.</p>
+            <p><strong>Status:</strong> <span id="pushStatus">Uit op dit apparaat</span></p>
+            <div class="action-row">
+              <button id="enablePush" type="button">Meldingen inschakelen</button>
+              <button id="disablePush" class="secondary" type="button">Meldingen uitschakelen</button>
+            </div>
+            <details>
+              <summary>Eenmalige Firebase-instelling</summary>
+              <label for="vapidKey">Web Push VAPID-sleutel</label>
+              <input id="vapidKey" type="text" autocomplete="off" placeholder="Plak hier de openbare VAPID-sleutel">
+              <div class="action-row"><button id="saveVapidKey" type="button">VAPID-sleutel opslaan</button></div>
+            </details>
+            <div id="pushMessage" class="message hidden"></div>
           </details>
 
           <details class="card">

@@ -1,4 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+import { getMessaging, getToken, deleteToken, onMessage } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-messaging.js";
 import {
   getFirestore, collection, doc, addDoc, setDoc, deleteDoc, getDoc, getDocs,
   onSnapshot, writeBatch, serverTimestamp, runTransaction
@@ -15,6 +16,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+let messaging = null;
+try { messaging = getMessaging(app); } catch (_) {}
 const APP_URL = "https://hogeterp.github.io/tiebreak-opstelling/";
 
 const DEFAULT_SCORE_WEIGHTS = { rating:40, spread:2, mix:20, partner:20, opponent:6, four:10 };
@@ -23,6 +26,7 @@ const $ = id => document.getElementById(id);
 const state = {
   players: [],
   responses: {},
+  responseMeta: {},
   dates: [],
   settings: {},
   selections: {},
@@ -35,7 +39,10 @@ const state = {
   defaultCourts: [5,6,9,10],
   currentMessage: "",
   pendingImport: [],
-  organizerOpen: sessionStorage.getItem("organizerOpen") === "1"
+  organizerOpen: sessionStorage.getItem("organizerOpen") === "1",
+  urgentCalls: {},
+  currentMessageType: "",
+  currentMessageDate: ""
 };
 
 function localDateKey(date) {
@@ -285,8 +292,39 @@ function renderPlayerSelect() {
   if (state.players.some(p => p.id === current)) select.value = current;
 }
 
-function groupedNames(date, status) {
-  return state.players.filter(p => (responseMap(date)[p.id] || "none") === status).map(displayName);
+function responseTimeMillis(value) {
+  if (!value) return Number.POSITIVE_INFINITY;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value.seconds === "number") return value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1e6);
+  if (value instanceof Date) return value.getTime();
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
+}
+
+function signupOrderMap(date) {
+  const meta = state.responseMeta[date] || {};
+  const signedUp = state.players
+    .map(player => {
+      const playerMeta = meta[player.id] || {};
+      const canUseUpdatedAt = playerMeta.status === "yes";
+      return {
+        id: player.id,
+        time: responseTimeMillis(playerMeta.firstYesAt || (canUseUpdatedAt ? playerMeta.updatedAt : null)),
+        fallback: Number(player.number) || Number.MAX_SAFE_INTEGER
+      };
+    })
+    .filter(item => Number.isFinite(item.time))
+    .sort((a,b) => a.time - b.time || a.fallback - b.fallback);
+  return new Map(signedUp.map((item,index) => [item.id,index + 1]));
+}
+
+function groupedPlayers(date, status) {
+  const order = signupOrderMap(date);
+  const players = state.players.filter(p => (responseMap(date)[p.id] || "none") === status);
+  if (status === "yes") {
+    players.sort((a,b) => (order.get(a.id) || Number.MAX_SAFE_INTEGER) - (order.get(b.id) || Number.MAX_SAFE_INTEGER) || a.number - b.number);
+  }
+  return players.map(player => ({ player, signupNumber: order.get(player.id) || null }));
 }
 
 function participantDateCard(date) {
@@ -312,7 +350,7 @@ function participantDateCard(date) {
         ${groups.map(([status,label,count]) => `
           <details class="people-group">
             <summary>${label} (${count})</summary>
-            <ul>${groupedNames(date,status).map(n=>`<li>${escapeHtml(n)}</li>`).join("") || "<li>Niemand</li>"}</ul>
+            <ul>${groupedPlayers(date,status).map(({player,signupNumber})=>`<li>${status === "yes" && signupNumber ? `<strong>${signupNumber}.</strong> ` : ""}${escapeHtml(displayName(player))}</li>`).join("") || "<li>Niemand</li>"}</ul>
           </details>`).join("")}
       </div>
     </article>`;
@@ -332,13 +370,19 @@ function renderParticipantDates() {
 
 async function setResponse(date, playerId, status, source) {
   if (source === "organisator" && !assertEditable(date)) return;
-  await setDoc(doc(db, "playingDates", date, "responses", playerId), {
-    playerId, status, source, updatedAt:serverTimestamp()
-  });
+  const oldStatus=(state.responses[date]||{})[playerId]||"none";
+  const existingMeta=(state.responseMeta[date]||{})[playerId]||{};
+  const firstYesAt = existingMeta.firstYesAt || (status === "yes" ? serverTimestamp() : null);
+  const payload = { playerId, status, source, updatedAt:serverTimestamp() };
+  if (firstYesAt) payload.firstYesAt = firstYesAt;
+  await setDoc(doc(db, "playingDates", date, "responses", playerId), payload, { merge:true });
   state.responses[date] = state.responses[date] || {};
+  state.responseMeta[date] = state.responseMeta[date] || {};
   state.responses[date][playerId] = status;
+  state.responseMeta[date][playerId] = { ...existingMeta, ...payload, updatedAt:new Date(), firstYesAt:existingMeta.firstYesAt || (status === "yes" ? new Date() : null) };
   await saveArchiveSnapshot(date);
   await logAction("beschikbaarheid_gewijzigd", { date, playerId, status, source });
+  await registerUrgentSignup(date,playerId,oldStatus,status,source);
 }
 
 function fillDateSelects() {
@@ -402,10 +446,20 @@ function renderCourtPicker(settings) {
 
 function renderOrganizerStatuses(date) {
   const map = responseMap(date);
-  $("organizerStatuses").innerHTML = state.players.map(p => {
+  const signupOrder = signupOrderMap(date);
+  const orderedPlayers = [...state.players].sort((a,b) => {
+    const aStatus = map[a.id] || "none";
+    const bStatus = map[b.id] || "none";
+    if (aStatus === "yes" && bStatus !== "yes") return -1;
+    if (aStatus !== "yes" && bStatus === "yes") return 1;
+    if (aStatus === "yes" && bStatus === "yes") return (signupOrder.get(a.id) || Number.MAX_SAFE_INTEGER) - (signupOrder.get(b.id) || Number.MAX_SAFE_INTEGER);
+    return a.number - b.number;
+  });
+  $("organizerStatuses").innerHTML = orderedPlayers.map(p => {
     const status = map[p.id] || "none";
+    const signupNumber = signupOrder.get(p.id);
     return `<div class="status-row">
-      <div><strong>${escapeHtml(displayName(p))}</strong><div class="player-meta">nr. ${p.number} · rating ${formatRating(p.rating)}</div></div>
+      <div><strong>${status === "yes" && signupNumber ? `${signupNumber}. ` : ""}${escapeHtml(displayName(p))}</strong><div class="player-meta">deelnemernr. ${p.number} · rating ${formatRating(p.rating)}${signupNumber ? ` · aanmeldnr. ${signupNumber}` : ""}</div></div>
       <div class="inline-status">
         <button class="yes ${status==="yes"?"active":""}" data-player="${p.id}" data-status="yes">✓</button>
         <button class="maybe ${status==="maybe"?"active":""}" data-player="${p.id}" data-status="maybe">?</button>
@@ -524,6 +578,7 @@ async function resetFutureEvening() {
     ]);
 
     state.responses[date] = {};
+    state.responseMeta[date] = {};
     delete state.selections[date];
     delete state.schedules[date];
     state.archiveDates = state.archiveDates.filter(d => d !== date);
@@ -1191,6 +1246,114 @@ function missingFields(p) {
   return missing;
 }
 
+
+function deviceId() {
+  let id=localStorage.getItem("supertieDeviceId");
+  if(!id){ id=crypto.randomUUID(); localStorage.setItem("supertieDeviceId",id); }
+  return id;
+}
+
+async function loadUrgentCall(date){
+  const snap=await getDoc(doc(db,"urgentCalls",date));
+  const value=snap.exists()?snap.data():{active:false};
+  state.urgentCalls[date]=value;
+  return value;
+}
+
+async function startUrgentCall(date){
+  const data={active:true,date,startedAt:serverTimestamp(),startedAtClient:new Date().toISOString()};
+  await setDoc(doc(db,"urgentCalls",date),data,{merge:true});
+  state.urgentCalls[date]={...data,startedAtClient:new Date().toISOString()};
+  await logAction("dringende_oproep_gestart",{date});
+  renderUrgentCallStatus(date);
+}
+
+async function closeUrgentCall(){
+  const date=$("whatsappDateSelect").value||state.dates[0];
+  await setDoc(doc(db,"urgentCalls",date),{active:false,closedAt:serverTimestamp()},{merge:true});
+  state.urgentCalls[date]={...(state.urgentCalls[date]||{}),active:false};
+  await logAction("dringende_oproep_beeindigd",{date});
+  renderUrgentCallStatus(date);
+}
+
+async function renderUrgentCallStatus(date){
+  if(!$("urgentCallStatus")) return;
+  const call=await loadUrgentCall(date);
+  $("urgentCallStatus").innerHTML=call.active
+    ? `<div class="message success"><strong>Dringende oproep actief</strong><br>Nieuwe aanmeldingen voor ${escapeHtml(capitalize(formatDate(date)))} geven een pushmelding.</div>`
+    : `<div class="message">Er is geen dringende oproep actief voor deze speelavond.</div>`;
+  $("closeUrgentCall").classList.toggle("hidden",!call.active);
+}
+
+async function notificationSettings(){
+  const snap=await getDoc(doc(db,"settings","notifications"));
+  return snap.exists()?snap.data():{};
+}
+
+async function enablePushNotifications(){
+  const message=$("pushMessage");
+  try{
+    if(!messaging || !("Notification" in window) || !("serviceWorker" in navigator)) throw new Error("Pushmeldingen worden op dit apparaat niet ondersteund.");
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted") throw new Error("Toestemming voor meldingen is niet gegeven.");
+    const settings=await notificationSettings();
+    const vapidKey=String(settings.vapidKey||"").trim();
+    if(!vapidKey) throw new Error("De Firebase VAPID-sleutel moet eerst éénmalig worden ingevuld.");
+    const registration=await navigator.serviceWorker.register("./firebase-messaging-sw.js?v=2.3.1");
+    const token=await getToken(messaging,{vapidKey,serviceWorkerRegistration:registration});
+    if(!token) throw new Error("Er kon geen meldingstoken worden gemaakt.");
+    await setDoc(doc(db,"notificationDevices",deviceId()),{token,enabled:true,userAgent:navigator.userAgent,updatedAt:serverTimestamp()},{merge:true});
+    localStorage.setItem("supertiePushToken",token);
+    showMessage(message,"Pushmeldingen staan aan op dit apparaat.","success");
+    updatePushStatus();
+  }catch(error){ showMessage(message,error.message||"Pushmeldingen inschakelen is mislukt.","error"); }
+}
+
+async function disablePushNotifications(){
+  const message=$("pushMessage");
+  try{
+    const token=localStorage.getItem("supertiePushToken");
+    if(token && messaging) await deleteToken(messaging).catch(()=>{});
+    await setDoc(doc(db,"notificationDevices",deviceId()),{enabled:false,updatedAt:serverTimestamp()},{merge:true});
+    localStorage.removeItem("supertiePushToken");
+    showMessage(message,"Pushmeldingen staan uit op dit apparaat.","success");
+    updatePushStatus();
+  }catch(error){ showMessage(message,error.message||"Uitschakelen is mislukt.","error"); }
+}
+
+async function saveVapidKey(){
+  const key=$("vapidKey").value.trim();
+  if(!key){ showMessage($("pushMessage"),"Vul eerst de VAPID-sleutel in.","error"); return; }
+  await setDoc(doc(db,"settings","notifications"),{vapidKey:key,updatedAt:serverTimestamp()},{merge:true});
+  showMessage($("pushMessage"),"VAPID-sleutel opgeslagen.","success");
+}
+
+async function updatePushStatus(){
+  if(!$("pushStatus")) return;
+  const enabled=Boolean(localStorage.getItem("supertiePushToken"));
+  $("pushStatus").textContent=enabled?"Aan op dit apparaat":"Uit op dit apparaat";
+  const settings=await notificationSettings();
+  $("vapidKey").value=settings.vapidKey||"";
+}
+
+async function registerUrgentSignup(date,playerId,oldStatus,newStatus,source){
+  if(source!=="deelnemer" || newStatus!=="yes" || oldStatus==="yes") return;
+  const call=await loadUrgentCall(date);
+  if(!call.active) return;
+  const player=playerById(playerId);
+  await addDoc(collection(db,"urgentSignups"),{
+    date,playerId,playerName:player?displayName(player):"Onbekende speler",status:"pending",createdAt:serverTimestamp()
+  });
+}
+
+if(messaging){
+  onMessage(messaging,payload=>{
+    const title=payload.notification?.title||"Supertiebreak";
+    const body=payload.notification?.body||"Nieuwe aanmelding.";
+    if(Notification.permission==="granted") new Notification(title,{body,icon:"./icon-192-v221.png"});
+  });
+}
+
 async function buildMessage(type,date) {
   const settings=await loadEveningSettings(date);
   const counts=getCounts(date);
@@ -1295,13 +1458,16 @@ async function buildMessage(type,date) {
 
 async function openMessagePreview(type) {
   const date=$("whatsappDateSelect").value||state.dates[0];
+  state.currentMessageType=type;
+  state.currentMessageDate=date;
   state.currentMessage=await buildMessage(type,date);
   $("whatsappPreview").value=state.currentMessage;
   $("whatsappDialog").showModal();
 }
 
-function openWhatsApp() {
+async function openWhatsApp() {
   const text=$("whatsappPreview").value.trim();
+  if(state.currentMessageType==="urgent") await startUrgentCall(state.currentMessageDate);
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,"_blank");
 }
 
@@ -1802,6 +1968,7 @@ function attachEvents() {
   $("participantPlayer").onchange=renderParticipantDates;
   $("orgDateSelect").onchange=renderOrganizerEvening;
   $("scheduleDateSelect").onchange=renderSchedulePanel;
+  $("whatsappDateSelect").onchange=()=>renderUrgentCallStatus($("whatsappDateSelect").value);
   $("courtCount").onchange=async()=>{
     const date=$("orgDateSelect").value;
     const current=await loadEveningSettings(date);
@@ -1829,6 +1996,10 @@ function attachEvents() {
   $("saveManualSchedule").onclick=saveManualSchedule;
   document.querySelectorAll("[data-message]").forEach(b=>b.onclick=()=>openMessagePreview(b.dataset.message));
   $("openWhatsApp").onclick=openWhatsApp;
+  $("closeUrgentCall").onclick=closeUrgentCall;
+  $("enablePush").onclick=enablePushNotifications;
+  $("disablePush").onclick=disablePushNotifications;
+  $("saveVapidKey").onclick=saveVapidKey;
   $("savePlayer").onclick=savePlayer;
   $("cancelEdit").onclick=resetPlayerForm;
   $("importText").onclick=()=>previewImport(parseDelimitedRows($("bulkText").value));
@@ -1858,7 +2029,8 @@ async function loadExistingDocs() {
       getDoc(doc(db,"schedules",date))
     ]);
     state.responses[date]={};
-    respSnap.forEach(d=>state.responses[date][d.id]=d.data().status);
+    state.responseMeta[date]={};
+    respSnap.forEach(d=>{ const data=d.data(); state.responses[date][d.id]=data.status; state.responseMeta[date][d.id]=data; });
     if(selectionSnap.exists())state.selections[date]=selectionSnap.data();
     if (scheduleSnap.exists()) {
       const rawSchedule = scheduleSnap.data();
@@ -1878,7 +2050,9 @@ async function loadExistingDocs() {
 function subscribeResponses() {
   state.dates.forEach(date=>{
     onSnapshot(collection(db,"playingDates",date,"responses"),snap=>{
-      state.responses[date]={};snap.forEach(d=>state.responses[date][d.id]=d.data().status);
+      state.responses[date]={};
+      state.responseMeta[date]={};
+      snap.forEach(d=>{ const data=d.data(); state.responses[date][d.id]=data.status; state.responseMeta[date][d.id]=data; });
       renderParticipantDates();
       if(state.organizerOpen){
         renderDashboard($("orgDateSelect").value||state.dates[0]);
