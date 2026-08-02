@@ -262,3 +262,16 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 @media(max-width:640px){.install-grid{grid-template-columns:1fr}}
 
 .install-steps{margin:10px 0 14px;padding-left:22px}.install-steps li{margin:7px 0;line-height:1.35}
+
+
+/* v2.3.4 slim spelers resetten */
+.smart-reset-box{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:10px;background:#f8faf9}
+.smart-reset-box h3{margin:0 0 5px;font-size:.95rem}
+.smart-reset-grid{align-items:end;margin-top:8px}
+.align-end{align-items:flex-end}
+.reset-player-check{display:flex;align-items:center;gap:9px;margin:0;cursor:pointer;font-size:inherit}
+.reset-player-check input{width:auto;flex:0 0 auto}
+.reset-player-check>span{display:flex;flex-direction:column;min-width:0}
+.reset-player-check .player-meta{display:block}
+.status-player-main{min-width:0}
+@media(max-width:520px){.smart-reset-grid{grid-template-columns:1fr}.smart-reset-grid .action-row button{width:100%}}

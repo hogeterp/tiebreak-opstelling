@@ -30,14 +30,14 @@ self.addEventListener('notificationclick',event=>{
   }));
 });
 
-const CACHE = 'supertiebreak-v2.3.3';
+const CACHE = 'supertiebreak-v2.3.4';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=2.3.3',
-  './app.js?v=2.3.3',
-  './install.js?v=2.3.3',
-  './manifest.webmanifest?v=2.3.3',
+  './style.css?v=2.3.4',
+  './app.js?v=2.3.4',
+  './install.js?v=2.3.4',
+  './manifest.webmanifest?v=2.3.4',
   './club-logo.png',
   './icon-192-v221.png',
   './icon-512-v221.png',

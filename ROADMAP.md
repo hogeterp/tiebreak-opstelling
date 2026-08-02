@@ -37,3 +37,11 @@ Supertiebreak-opstelling
 - Installeerbare app voor Android, iPhone en iPad.
 - Eigen app-icoon en beginschermkoppeling.
 - PWA-manifest en serviceworker.
+
+
+## Afgerond in v2.3.4
+
+- [x] Eén speler naar Geen reactie resetten.
+- [x] Meerdere geselecteerde spelers tegelijk resetten.
+- [x] Dringende oproep volledig uitschakelen.
+- [x] Oude en dubbele pushregistraties automatisch opruimen.

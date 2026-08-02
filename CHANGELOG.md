@@ -1,5 +1,15 @@
 # Wijzigingen
 
+## v2.3.4
+
+- Eén speler kan afzonderlijk naar **Geen reactie** worden teruggezet.
+- Meerdere geselecteerde spelers kunnen tegelijk worden gereset.
+- Andere aanmeldingen blijven bij deze reset behouden.
+- **Dringende oproep beëindigen** zet `urgentCalls.active` automatisch op `false`.
+- Oude, uitgeschakelde en dubbele apparaatregistraties worden automatisch verwijderd.
+- Vóór een dringende melding worden de oproepstatus en pushregistraties opnieuw gecontroleerd.
+- Cache- en versieverwijzingen bijgewerkt naar v2.3.4.
+
 ## v2.3.3
 
 - Pushstatus wordt bij het openen van de app automatisch opnieuw gecontroleerd.

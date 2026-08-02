@@ -19,7 +19,7 @@ const db = getFirestore(app);
 let messaging = null;
 try { messaging = getMessaging(app); } catch (_) {}
 const APP_URL = "https://hogeterp.github.io/tiebreak-opstelling/";
-const PUSH_SW_URL = "./sw.js?v=2.3.3";
+const PUSH_SW_URL = "./sw.js?v=2.3.4";
 
 const DEFAULT_SCORE_WEIGHTS = { rating:40, spread:2, mix:20, partner:20, opponent:6, four:10 };
 
@@ -43,7 +43,8 @@ const state = {
   organizerOpen: sessionStorage.getItem("organizerOpen") === "1",
   urgentCalls: {},
   currentMessageType: "",
-  currentMessageDate: ""
+  currentMessageDate: "",
+  resetPlayerIds: new Set()
 };
 
 function localDateKey(date) {
@@ -411,6 +412,7 @@ async function renderOrganizerEvening() {
   renderCourtPicker(settings);
   renderDashboard(date);
   renderOrganizerStatuses(date);
+  fillResetPlayerSelect();
 }
 
 function renderDashboard(date) {
@@ -461,7 +463,12 @@ function renderOrganizerStatuses(date) {
     const status = map[p.id] || "none";
     const signupNumber = signupOrder.get(p.id);
     return `<div class="status-row">
-      <div><strong>${status === "yes" && signupNumber ? `${signupNumber}. ` : ""}${escapeHtml(displayName(p))}</strong><div class="player-meta">deelnemernr. ${p.number} · rating ${formatRating(p.rating)}${signupNumber ? ` · aanmeldnr. ${signupNumber}` : ""}</div></div>
+      <div class="status-player-main">
+        <label class="reset-player-check" title="Selecteer om deze speler terug te zetten naar Geen reactie">
+          <input type="checkbox" data-reset-player="${p.id}" ${state.resetPlayerIds.has(p.id)?"checked":""}>
+          <span><strong>${status === "yes" && signupNumber ? `${signupNumber}. ` : ""}${escapeHtml(displayName(p))}</strong><span class="player-meta">deelnemernr. ${p.number} · rating ${formatRating(p.rating)}${signupNumber ? ` · aanmeldnr. ${signupNumber}` : ""}</span></span>
+        </label>
+      </div>
       <div class="inline-status">
         <button class="yes ${status==="yes"?"active":""}" data-player="${p.id}" data-status="yes">✓</button>
         <button class="maybe ${status==="maybe"?"active":""}" data-player="${p.id}" data-status="maybe">?</button>
@@ -472,6 +479,13 @@ function renderOrganizerStatuses(date) {
   document.querySelectorAll("#organizerStatuses [data-status]").forEach(btn => {
     btn.addEventListener("click", () => setResponse(date, btn.dataset.player, btn.dataset.status, "organisator"));
   });
+  document.querySelectorAll("#organizerStatuses [data-reset-player]").forEach(input => {
+    input.addEventListener("change", () => {
+      input.checked ? state.resetPlayerIds.add(input.dataset.resetPlayer) : state.resetPlayerIds.delete(input.dataset.resetPlayer);
+      updateResetPlayersButton();
+    });
+  });
+  updateResetPlayersButton();
 }
 
 function sortedCandidates(date) {
@@ -538,6 +552,59 @@ async function saveSelectionEditor() {
   await setDoc(doc(db,"selections",date),selection);
   $("selectionDialog").close();
   renderSelectionSummary(date);
+}
+
+function updateResetPlayersButton() {
+  const button=$("resetSelectedPlayers");
+  if(!button) return;
+  const count=state.resetPlayerIds.size;
+  button.disabled=count===0;
+  button.textContent=count ? `Geselecteerde spelers resetten (${count})` : "Geselecteerde spelers resetten";
+}
+
+async function resetPlayerResponses(playerIds) {
+  const date=$("orgDateSelect").value;
+  if(!date || !assertEditable(date)) return;
+  const unique=[...new Set((playerIds||[]).filter(Boolean))];
+  if(!unique.length){ showMessage($("resetPlayersMessage"),"Selecteer eerst één of meer spelers.","error"); return; }
+  const names=unique.map(id=>playerById(id)).filter(Boolean).map(displayName);
+  const confirmed=confirm(`Zet ${names.length===1?names[0]:`${names.length} spelers`} terug naar Geen reactie?\n\nAlle andere aanmeldingen blijven behouden.`);
+  if(!confirmed) return;
+  try{
+    const batch=writeBatch(db);
+    unique.forEach(id=>batch.delete(doc(db,"playingDates",date,"responses",id)));
+    await batch.commit();
+    state.responses[date]=state.responses[date]||{};
+    state.responseMeta[date]=state.responseMeta[date]||{};
+    unique.forEach(id=>{ delete state.responses[date][id]; delete state.responseMeta[date][id]; state.resetPlayerIds.delete(id); });
+    await saveArchiveSnapshot(date);
+    await logAction("spelerreacties_gereset",{date,playerIds:unique});
+    renderDashboard(date);
+    renderOrganizerStatuses(date);
+    renderParticipantDates();
+    showMessage($("resetPlayersMessage"),`${names.length===1?names[0]:`${names.length} spelers`} teruggezet naar Geen reactie. Andere aanmeldingen zijn behouden.`,"success");
+  }catch(error){
+    console.error("Spelerreacties resetten mislukt:",error);
+    showMessage($("resetPlayersMessage"),`Resetten mislukt: ${error.message||"onbekende fout"}`,"error");
+  }
+}
+
+async function resetOnePlayer() {
+  const id=$("resetOnePlayerSelect").value;
+  await resetPlayerResponses(id?[id]:[]);
+  $("resetOnePlayerSelect").value="";
+}
+
+async function resetSelectedPlayers() {
+  await resetPlayerResponses([...state.resetPlayerIds]);
+}
+
+function fillResetPlayerSelect() {
+  const select=$("resetOnePlayerSelect");
+  if(!select) return;
+  const current=select.value;
+  select.innerHTML='<option value="">Kies speler</option>'+state.players.map(p=>`<option value="${p.id}">${escapeHtml(displayName(p))}</option>`).join("");
+  if(state.players.some(p=>p.id===current)) select.value=current;
 }
 
 async function resetFutureEvening() {
@@ -1272,8 +1339,9 @@ async function startUrgentCall(date){
 
 async function closeUrgentCall(){
   const date=$("whatsappDateSelect").value||state.dates[0];
-  await setDoc(doc(db,"urgentCalls",date),{active:false,closedAt:serverTimestamp()},{merge:true});
-  state.urgentCalls[date]={...(state.urgentCalls[date]||{}),active:false};
+  const closed={active:false,date,closedAt:serverTimestamp(),closedAtClient:new Date().toISOString()};
+  await setDoc(doc(db,"urgentCalls",date),closed,{merge:true});
+  state.urgentCalls[date]={...(state.urgentCalls[date]||{}),...closed,active:false};
   await logAction("dringende_oproep_beeindigd",{date});
   renderUrgentCallStatus(date);
 }
@@ -1292,10 +1360,54 @@ async function notificationSettings(){
   return snap.exists()?snap.data():{};
 }
 
+function timestampMillis(value){
+  if(!value) return 0;
+  if(typeof value.toMillis==="function") return value.toMillis();
+  if(typeof value.seconds==="number") return value.seconds*1000;
+  const parsed=Date.parse(value);
+  return Number.isNaN(parsed)?0:parsed;
+}
+
+async function cleanupNotificationDevices(currentToken="") {
+  const snap=await getDocs(collection(db,"notificationDevices"));
+  const now=Date.now();
+  const staleBefore=now-1000*60*60*24*120;
+  const byToken=new Map();
+  snap.forEach(item=>{
+    const data=item.data()||{};
+    const token=String(data.token||"").trim();
+    if(token){
+      const list=byToken.get(token)||[];
+      list.push({ref:item.ref,id:item.id,data,time:timestampMillis(data.updatedAt)});
+      byToken.set(token,list);
+    }
+  });
+  const remove=[];
+  snap.forEach(item=>{
+    const data=item.data()||{};
+    const token=String(data.token||"").trim();
+    const stale=timestampMillis(data.updatedAt)>0 && timestampMillis(data.updatedAt)<staleBefore;
+    if(!token || data.enabled===false || stale) remove.push(item.ref);
+  });
+  byToken.forEach((items,token)=>{
+    if(items.length<2) return;
+    items.sort((a,b)=>b.time-a.time || (a.id===deviceId()?-1:1));
+    const keep=items.find(item=>item.id===deviceId() && (!currentToken || token===currentToken))||items[0];
+    items.filter(item=>item.ref.path!==keep.ref.path).forEach(item=>remove.push(item.ref));
+  });
+  const unique=[...new Map(remove.map(ref=>[ref.path,ref])).values()];
+  if(!unique.length) return 0;
+  const batch=writeBatch(db);
+  unique.forEach(ref=>batch.delete(ref));
+  await batch.commit();
+  return unique.length;
+}
+
 async function createOrRefreshPushToken(vapidKey){
   const registration=await navigator.serviceWorker.register(PUSH_SW_URL);
   const token=await getToken(messaging,{vapidKey,serviceWorkerRegistration:registration});
   if(!token) throw new Error("Er kon geen meldingstoken worden gemaakt.");
+  await cleanupNotificationDevices(token).catch(error=>console.warn("Oude pushregistraties opruimen mislukt:",error));
   await setDoc(doc(db,"notificationDevices",deviceId()),{
     token,
     enabled:true,
@@ -1303,6 +1415,7 @@ async function createOrRefreshPushToken(vapidKey){
     updatedAt:serverTimestamp()
   },{merge:true});
   localStorage.setItem("supertiePushToken",token);
+  await cleanupNotificationDevices(token).catch(error=>console.warn("Dubbele pushregistraties opruimen mislukt:",error));
   return token;
 }
 
@@ -1364,6 +1477,9 @@ async function registerUrgentSignup(date,playerId,oldStatus,newStatus,source){
   if(source!=="deelnemer" || newStatus!=="yes" || oldStatus==="yes") return;
   const call=await loadUrgentCall(date);
   if(!call.active) return;
+  await cleanupNotificationDevices().catch(error=>console.warn("Pushregistraties controleren mislukt:",error));
+  const refreshedCall=await loadUrgentCall(date);
+  if(!refreshedCall.active) return;
   const player=playerById(playerId);
   await addDoc(collection(db,"urgentSignups"),{
     date,playerId,playerName:player?displayName(player):"Onbekende speler",status:"pending",createdAt:serverTimestamp()
@@ -2015,6 +2131,8 @@ function attachEvents() {
   $("manualSelection").onclick=()=>openSelectionEditor($("scheduleDateSelect").value);
   $("saveSelection").onclick=saveSelectionEditor;
   $("resetFutureEvening").onclick=resetFutureEvening;
+  $("resetOnePlayer").onclick=resetOnePlayer;
+  $("resetSelectedPlayers").onclick=resetSelectedPlayers;
   $("autoSchedule").onclick=()=>automaticSchedule($("scheduleDateSelect").value);
   $("manualSchedule").onclick=()=>openManualEditor($("scheduleDateSelect").value);
   $("saveManualSchedule").onclick=saveManualSchedule;
