@@ -1,19 +1,17 @@
-# Supertiebreak-opstelling v2.3.4
+# Supertiebreak-opstelling v2.3.6
 
 Webapp voor de wekelijkse Supertiebreak bij TV Nieuw-Vennep.
 
-## Nieuw in v2.3.4
+## Nieuw in v2.3.6
 
-- Eén speler terugzetten naar **Geen reactie**.
-- Meerdere geselecteerde spelers tegelijk resetten, terwijl alle andere aanmeldingen behouden blijven.
-- **Dringende oproep beëindigen** schrijft automatisch `active: false` naar Firestore.
-- Oude, uitgeschakelde en dubbele apparaatregistraties worden automatisch opgeschoond.
-- Vóór een dringende pushmelding worden de oproepstatus en apparaatregistraties opnieuw gecontroleerd.
-- Cache- en versieverwijzingen bijgewerkt naar v2.3.4.
-
-## Belangrijk bij pushmeldingen
-
-GitHub Pages toont alleen de webapp. Voor automatische pushmeldingen moet de Firebase Cloud Function één keer apart naar Firebase worden gepubliceerd. De webapp ruimt apparaatregistraties op; de Cloud Function moet daarnaast bij het verzenden ongeldige tokens verwijderen.
+- Firestore gebruikt permanente Security Rules in plaats van tijdelijke Test Mode-regels.
+- De organisator-PIN wordt veilig op de server gecontroleerd via Firebase Cloud Functions.
+- Firebase Authentication geeft na een geldige PIN tijdelijk organisatorrechten aan deze browsersessie.
+- De PIN-hash is niet meer leesbaar vanuit de browser.
+- Alleen de organisator kan spelers, banen, indelingen, archief en pushapparaten beheren.
+- Deelnemers kunnen zonder account gewoon Ja, Misschien of Nee blijven kiezen.
+- De Cloud Function synchroniseert archiefreacties en verstuurt dringende pushmeldingen.
+- Zie `FIREBASE-BEVEILIGING.txt` voor de verplichte installatievolgorde.
 
 ## Snelkoppeling installeren
 

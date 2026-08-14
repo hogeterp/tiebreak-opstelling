@@ -1,5 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 import { getMessaging, getToken, deleteToken, onMessage } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-messaging.js";
+import { getAuth, signInWithCustomToken, signOut, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-functions.js";
 import {
   getFirestore, collection, doc, addDoc, setDoc, deleteDoc, getDoc, getDocs,
   onSnapshot, writeBatch, serverTimestamp, runTransaction
@@ -16,10 +18,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+const functions = getFunctions(app);
 let messaging = null;
 try { messaging = getMessaging(app); } catch (_) {}
 const APP_URL = "https://hogeterp.github.io/tiebreak-opstelling/";
-const PUSH_SW_URL = "./sw.js?v=2.3.4";
+const PUSH_SW_URL = "./sw.js?v=2.3.6";
 
 const DEFAULT_SCORE_WEIGHTS = { rating:40, spread:2, mix:20, partner:20, opponent:6, four:10 };
 
@@ -40,7 +44,8 @@ const state = {
   defaultCourts: [5,6,9,10],
   currentMessage: "",
   pendingImport: [],
-  organizerOpen: sessionStorage.getItem("organizerOpen") === "1",
+  organizerOpen: false,
+  organizerPrivateLoaded: false,
   urgentCalls: {},
   currentMessageType: "",
   currentMessageDate: "",
@@ -245,20 +250,37 @@ function switchOrg(tab) {
   if (tab === "archive") renderArchiveViewer();
 }
 
+async function currentUserIsOrganizer() {
+  const user = auth.currentUser;
+  if (!user) return false;
+  try {
+    const token = await user.getIdTokenResult();
+    return token.claims.organizer === true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function loadOrganizerPrivateData(force=false) {
+  if (!state.organizerOpen) return;
+  if (state.organizerPrivateLoaded && !force) return;
+  await loadArchiveData();
+  state.organizerPrivateLoaded = true;
+  await updatePushStatus().catch(error=>console.warn("Pushstatus kon niet worden bijgewerkt:",error));
+}
+
 async function renderOrganizerGate() {
-  if (state.organizerOpen) {
+  if (state.organizerOpen && await currentUserIsOrganizer()) {
     $("pinGate").classList.add("hidden");
     $("organizerApp").classList.remove("hidden");
+    await loadOrganizerPrivateData();
     renderOrganizerEvening();
-    updatePushStatus().catch(error=>console.warn("Pushstatus kon niet worden bijgewerkt:",error));
     return;
   }
+  state.organizerOpen = false;
   $("organizerApp").classList.add("hidden");
   $("pinGate").classList.remove("hidden");
-  const pinDoc = await getDoc(doc(db, "settings", "organizer"));
-  $("pinHelp").textContent = pinDoc.exists()
-    ? "Voer de 4-cijferige pincode in."
-    : "Kies bij de eerste keer een 4-cijferige pincode.";
+  $("pinHelp").textContent = "Voer de 4-cijferige pincode in.";
 }
 
 async function submitPin() {
@@ -266,20 +288,24 @@ async function submitPin() {
   if (!/^\d{4}$/.test(pin)) {
     showMessage($("pinMessage"), "Vul precies vier cijfers in.", "error"); return;
   }
-  const ref = doc(db, "settings", "organizer");
-  const snap = await getDoc(ref);
-  const hash = await sha256(pin);
-  if (!snap.exists()) {
-    await setDoc(ref, { pinHash:hash, createdAt:serverTimestamp() });
-    await logAction("organisator_pincode_ingesteld");
-  } else if (snap.data().pinHash !== hash) {
-    showMessage($("pinMessage"), "Onjuiste pincode.", "error"); return;
+  try {
+    const login = httpsCallable(functions, "organizerLogin");
+    const result = await login({pin});
+    const token = result.data?.token;
+    if (!token) throw new Error("Geen veilige organisatortoken ontvangen.");
+    await setPersistence(auth, browserSessionPersistence);
+    await signInWithCustomToken(auth, token);
+    if (!(await currentUserIsOrganizer())) throw new Error("Organisatorrechten konden niet worden bevestigd.");
+    state.organizerOpen = true;
+    state.organizerPrivateLoaded = false;
+    $("pinInput").value = "";
+    hideMessage($("pinMessage"));
+    await loadOrganizerPrivateData(true);
+    await renderOrganizerGate();
+  } catch (error) {
+    console.error("Veilig aanmelden als organisator mislukt:", error);
+    showMessage($("pinMessage"), error?.message?.includes("resource-exhausted") ? "Te veel mislukte pogingen. Probeer het later opnieuw." : "Onjuiste pincode of veilige aanmelding is nog niet geactiveerd.", "error");
   }
-  state.organizerOpen = true;
-  sessionStorage.setItem("organizerOpen","1");
-  $("pinInput").value = "";
-  hideMessage($("pinMessage"));
-  renderOrganizerGate();
 }
 
 function renderPlayerSelect() {
@@ -383,7 +409,7 @@ async function setResponse(date, playerId, status, source) {
   state.responseMeta[date] = state.responseMeta[date] || {};
   state.responses[date][playerId] = status;
   state.responseMeta[date][playerId] = { ...existingMeta, ...payload, updatedAt:new Date(), firstYesAt:existingMeta.firstYesAt || (status === "yes" ? new Date() : null) };
-  await saveArchiveSnapshot(date);
+  if (source === "organisator" && state.organizerOpen) await saveArchiveSnapshot(date);
   await logAction("beschikbaarheid_gewijzigd", { date, playerId, status, source });
   await registerUrgentSignup(date,playerId,oldStatus,status,source);
 }
@@ -1474,16 +1500,8 @@ async function updatePushStatus(){
 }
 
 async function registerUrgentSignup(date,playerId,oldStatus,newStatus,source){
-  if(source!=="deelnemer" || newStatus!=="yes" || oldStatus==="yes") return;
-  const call=await loadUrgentCall(date);
-  if(!call.active) return;
-  await cleanupNotificationDevices().catch(error=>console.warn("Pushregistraties controleren mislukt:",error));
-  const refreshedCall=await loadUrgentCall(date);
-  if(!refreshedCall.active) return;
-  const player=playerById(playerId);
-  await addDoc(collection(db,"urgentSignups"),{
-    date,playerId,playerName:player?displayName(player):"Onbekende speler",status:"pending",createdAt:serverTimestamp()
-  });
+  // v2.3.6: de Cloud Function bewaakt veilige statusovergangen en verstuurt de pushmelding.
+  return;
 }
 
 if(messaging){
@@ -1899,11 +1917,15 @@ async function removeForbiddenPair(key){
 async function changePin() {
   const oldPin=$("oldPin").value.trim(),newPin=$("newPin").value.trim();
   if(!/^\d{4}$/.test(oldPin)||!/^\d{4}$/.test(newPin)){showMessage($("settingsMessage"),"Gebruik twee pincodes van vier cijfers.","error");return}
-  const ref=doc(db,"settings","organizer"),snap=await getDoc(ref);
-  if(!snap.exists()||snap.data().pinHash!==await sha256(oldPin)){showMessage($("settingsMessage"),"Huidige pincode klopt niet.","error");return}
-  await setDoc(ref,{pinHash:await sha256(newPin),updatedAt:serverTimestamp()},{merge:true});
-  $("oldPin").value="";$("newPin").value="";
-  showMessage($("settingsMessage"),"Pincode gewijzigd.","success");
+  try {
+    const change = httpsCallable(functions, "changeOrganizerPin");
+    await change({oldPin,newPin});
+    $("oldPin").value="";$("newPin").value="";
+    showMessage($("settingsMessage"),"Pincode veilig gewijzigd.","success");
+  } catch (error) {
+    console.error("Pincode wijzigen mislukt:", error);
+    showMessage($("settingsMessage"),"Pincode wijzigen is mislukt. Controleer de huidige pincode.","error");
+  }
 }
 
 async function saveArchiveSnapshot(date) {
@@ -2160,7 +2182,12 @@ function attachEvents() {
   $("relockArchive").onclick=relockArchiveEvening;
   $("editArchiveEvening").onclick=()=>openUnlockedArchive("evening");
   $("editArchiveSchedule").onclick=()=>openUnlockedArchive("schedule");
-  $("logoutOrganizer").onclick=()=>{state.organizerOpen=false;sessionStorage.removeItem("organizerOpen");switchMain("participant")};
+  $("logoutOrganizer").onclick=async()=>{
+    await signOut(auth).catch(()=>{});
+    state.organizerOpen=false;
+    state.organizerPrivateLoaded=false;
+    switchMain("participant");
+  };
 }
 
 async function loadExistingDocs() {
@@ -2204,25 +2231,40 @@ function subscribeResponses() {
   });
 }
 
+async function waitForAuthReady() {
+  return new Promise(resolve=>{
+    const unsubscribe=onAuthStateChanged(auth,async user=>{
+      unsubscribe();
+      if(!user){ resolve(false); return; }
+      resolve(await currentUserIsOrganizer());
+    },()=>resolve(false));
+  });
+}
+
 async function init() {
+  await setPersistence(auth,browserSessionPersistence).catch(()=>{});
+  state.organizerOpen = await waitForAuthReady();
   await loadSkippedDates();
   await loadDefaultCourts();
   await loadForbiddenPairs();
   state.dates=getOpenTuesdays();
   attachEvents();
-  await updatePushStatus().catch(error=>console.warn("Pushstatus kon niet worden bijgewerkt:",error));
   renderSkippedDates();
   renderDefaultCourtPicker();
-  await loadArchiveData();
-  for (const date of state.archiveDates.filter(d => !state.dates.includes(d))) {
-    if (!(date in state.archiveLocks)) state.archiveLocks[date] = true;
+  if(state.organizerOpen){
+    await loadOrganizerPrivateData(true);
+    for (const date of state.archiveDates.filter(d => !state.dates.includes(d))) {
+      if (!(date in state.archiveLocks)) state.archiveLocks[date] = true;
+    }
   }
   onSnapshot(collection(db,"players"),async snap=>{
     const loadedPlayers=snap.docs.map(d=>({id:d.id,...d.data()}));
-    const migrated=await ensureUniquePlayerNumbers(loadedPlayers);
-    if (migrated) return;
-    const memberMigrated=await ensureMemberStatus(loadedPlayers);
-    if (memberMigrated) return;
+    if(state.organizerOpen){
+      const migrated=await ensureUniquePlayerNumbers(loadedPlayers);
+      if (migrated) return;
+      const memberMigrated=await ensureMemberStatus(loadedPlayers);
+      if (memberMigrated) return;
+    }
     state.players=loadedPlayers.sort((a,b)=>(a.number??9999)-(b.number??9999));
     renderPlayerSelect();
     renderForbiddenPairs();
@@ -2233,7 +2275,7 @@ async function init() {
   subscribeResponses();
   fillDateSelects();
   renderParticipantDates();
-  if(state.organizerOpen)renderOrganizerGate();
+  if(state.organizerOpen) await renderOrganizerGate();
 }
 
 init().catch(err=>{

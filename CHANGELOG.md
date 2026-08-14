@@ -1,5 +1,23 @@
 # Wijzigingen
 
+## v2.3.6
+
+- Firestore Test Mode vervangen door permanente Security Rules.
+- Organisator-PIN wordt server-side gecontroleerd via een Firebase Cloud Function en Firebase Auth custom claim.
+- De PIN-hash in `settings/organizer` is niet meer leesbaar of schrijfbaar vanuit de browser.
+- Beheercollecties zijn alleen schrijfbaar voor een geauthenticeerde organisator.
+- Deelnemers mogen zonder account uitsluitend geldige Ja/Misschien/Nee-reacties opslaan.
+- Cloud Function houdt archiefreacties bij en verstuurt de dringende pushmelding bij een nieuwe Ja-aanmelding.
+- Tijdelijke blokkade na meerdere foutieve PIN-pogingen toegevoegd.
+- Cache- en versieverwijzingen bijgewerkt naar v2.3.6.
+
+## v2.3.5
+
+- Nieuwe definitieve maskable appiconen voor Android toegevoegd.
+- Maskable iconen hebben nieuwe v235-bestandsnamen om oude Android-cache te omzeilen.
+- Manifest en serviceworker verwijzen naar de nieuwe maskable iconen.
+- Cache- en versieverwijzingen bijgewerkt naar v2.3.5.
+
 ## v2.3.4
 
 - Eén speler kan afzonderlijk naar **Geen reactie** worden teruggezet.

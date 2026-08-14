@@ -1,4 +1,4 @@
-PUSHMELDINGEN – VERSIE 2.3.4
+PUSHMELDINGEN – VERSIE 2.3.6
 
 De gewone webapp kan zonder map functions naar GitHub worden geüpload.
 
@@ -10,4 +10,4 @@ IN DE APP:
 5. Plak de VAPID-sleutel, sla hem op en druk op Meldingen inschakelen.
 
 EENMALIGE TECHNISCHE STAP:
-Voor het werkelijk versturen van een melding moet de Firebase Cloud Function één keer apart naar Firebase worden gepubliceerd. Gebruik daarvoor het aparte pakket Firebase-push-backend-v2.3.4.zip. Deze bestanden hoeven niet naar GitHub Pages.
+Voor het werkelijk versturen van een melding moet de Firebase Cloud Function één keer apart naar Firebase worden gepubliceerd. Gebruik vanaf v2.3.6 het aparte pakket Firebase-backend-v2.3.6.zip. Dit pakket bevat ook de veilige organisatorlogin en archiefsync. Deze bestanden hoeven niet naar GitHub Pages.

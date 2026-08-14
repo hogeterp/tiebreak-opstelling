@@ -30,19 +30,19 @@ self.addEventListener('notificationclick',event=>{
   }));
 });
 
-const CACHE = 'supertiebreak-v2.3.4';
+const CACHE = 'supertiebreak-v2.3.6';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=2.3.4',
-  './app.js?v=2.3.4',
-  './install.js?v=2.3.4',
-  './manifest.webmanifest?v=2.3.4',
+  './style.css?v=2.3.6',
+  './app.js?v=2.3.6',
+  './install.js?v=2.3.6',
+  './manifest.webmanifest?v=2.3.6',
   './club-logo.png',
   './icon-192-v221.png',
   './icon-512-v221.png',
-  './icon-maskable-192-v221.png',
-  './icon-maskable-512-v221.png',
+  './icon-maskable-192-v235.png',
+  './icon-maskable-512-v235.png',
   './apple-touch-icon-v221.png',
   './app-icon-source.png'
 ];

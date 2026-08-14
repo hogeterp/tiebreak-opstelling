@@ -1,0 +1,51 @@
+SUPERTIEBREAK v2.3.6 – FIRESTORE BEVEILIGING
+
+WAAROM DEZE VERSIE
+De oude Firestore Test Mode-regels verlopen. v2.3.6 gebruikt permanente Security Rules en veilige organisator-authenticatie via een Firebase Cloud Function.
+
+BELANGRIJK: VOLGORDE
+Publiceer NIET eerst de strenge Firestore-regels. Anders kan de oude webapp stoppen met werken.
+
+1. Deploy eerst Firebase-backend-v2.3.6.
+2. Upload daarna Supertiebreak-opstelling-v2.3.6 naar GitHub Pages.
+3. Test of de organisator met de bestaande 4-cijferige PIN kan inloggen.
+4. Test of een deelnemer Ja/Misschien/Nee kan kiezen.
+5. Publiceer PAS DAN firestore.rules in Firebase Console > Firestore Database > Regels.
+6. Test opnieuw deelnemer + organisator + pushmelding.
+
+WAT ER VERANDERT
+- De organisator-PIN-hash is niet meer leesbaar vanuit de browser.
+- Organisatorrechten worden door een Cloud Function gecontroleerd en als Firebase Auth-claim uitgegeven.
+- Alleen de organisator mag spelers, banen, indelingen, archief, pushapparaten en beheerinstellingen wijzigen.
+- Deelnemers mogen zonder account alleen hun Ja/Misschien/Nee-reactie schrijven volgens een strak schema.
+- De Cloud Function houdt het archief bij na deelnemerreacties.
+- De Cloud Function verstuurt de dringende pushmelding wanneer een deelnemer tijdens een actieve oproep op Ja gaat.
+- Na 5 verkeerde PIN-pogingen vanaf hetzelfde apparaat/netwerk volgt tijdelijk een blokkade.
+
+BACKEND DEPLOYEN
+Gebruik het aparte pakket Firebase-backend-v2.3.6.zip.
+In een terminal met Firebase CLI:
+
+  firebase login
+  firebase use tiebreak-opstelling
+  cd Firebase-backend-v2.3.6
+  npm --prefix functions install
+  firebase deploy --only functions
+
+Daarna de webapp uploaden en testen.
+
+De bestaande organisator-PIN uit v2.3.5 blijft gebruikt worden. Als settings/organizer ontbreekt, stopt de veilige login bewust en moet de PIN eerst handmatig worden hersteld; er wordt nooit automatisch een nieuwe beheer-PIN geclaimd.
+
+FIRESTORE-REGELS PUBLICEREN
+Optie A – Firebase Console:
+- Open Firebase Console.
+- Kies project Tiebreak-Opstelling.
+- Firestore Database > Regels.
+- Vervang de bestaande Test Mode-regels door de inhoud van firestore.rules.
+- Klik Publiceren.
+
+Optie B – Firebase CLI:
+  firebase deploy --only firestore:rules
+
+LET OP
+Zonder gebruikersaccounts kan Firestore niet bewijzen dat iemand werkelijk de gekozen speler is. v2.3.6 beperkt deelnemers daarom technisch tot uitsluitend geldige reactievelden, maar een kwaadwillende bezoeker die een speler-ID kent zou in theorie nog namens die speler kunnen reageren. Voor volledige persoonsverificatie zijn individuele spelersaccounts nodig.

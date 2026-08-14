@@ -45,3 +45,19 @@ Supertiebreak-opstelling
 - [x] Meerdere geselecteerde spelers tegelijk resetten.
 - [x] Dringende oproep volledig uitschakelen.
 - [x] Oude en dubbele pushregistraties automatisch opruimen.
+
+
+## Afgerond in v2.3.5
+
+- [x] Definitieve maskable Android-iconen vervangen.
+- [x] Nieuwe icoonbestandsnamen gebruikt om oude cache te omzeilen.
+- [x] Manifest, serviceworker en versiecache bijgewerkt.
+
+
+## Afgerond in v2.3.6
+
+- [x] Firestore Test Mode vervangen door permanente Security Rules.
+- [x] Organisator-PIN server-side beveiligen.
+- [x] Firebase Auth custom claim voor organisatorrechten.
+- [x] Deelnemerwrites beperken tot geldige reacties.
+- [x] Pushmelding en archiefsync server-side afhandelen.

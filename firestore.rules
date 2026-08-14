@@ -1,11 +1,113 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Tijdelijke regels voor een besloten groep zonder Firebase Authentication.
-    // De 4-cijferige pincode beschermt alleen de gebruikersinterface.
-    // Voor echte beveiliging is Firebase Authentication nodig.
-    match /{document=**} {
-      allow read, write: if true;
+    function isOrganizer() {
+      return request.auth != null && request.auth.token.organizer == true;
+    }
+
+    function hasFirstYes(data) {
+      return data.keys().hasAny(['firstYesAt']);
+    }
+
+    function validParticipantResponse(playerId) {
+      return request.resource.data.keys().hasOnly([
+          'playerId', 'status', 'source', 'updatedAt', 'firstYesAt'
+        ])
+        && request.resource.data.playerId == playerId
+        && request.resource.data.status in ['yes', 'maybe', 'no']
+        && request.resource.data.source == 'deelnemer'
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    match /players/{playerId} {
+      allow read: if true;
+      allow create, update, delete: if isOrganizer();
+    }
+
+    match /playingDates/{date}/responses/{playerId} {
+      allow read: if true;
+
+      allow create: if isOrganizer() || (
+        validParticipantResponse(playerId)
+        && (!hasFirstYes(request.resource.data)
+            || (request.resource.data.status == 'yes'
+                && request.resource.data.firstYesAt == request.time))
+      );
+
+      allow update: if isOrganizer() || (
+        validParticipantResponse(playerId)
+        && (
+          (hasFirstYes(resource.data)
+            && hasFirstYes(request.resource.data)
+            && request.resource.data.firstYesAt == resource.data.firstYesAt)
+          ||
+          (!hasFirstYes(resource.data)
+            && (!hasFirstYes(request.resource.data)
+                || (request.resource.data.status == 'yes'
+                    && request.resource.data.firstYesAt == request.time)))
+        )
+      );
+
+      allow delete: if isOrganizer();
+    }
+
+    match /evenings/{date} {
+      allow read: if true;
+      allow create, update, delete: if isOrganizer();
+    }
+
+    match /selections/{date} {
+      allow read: if true;
+      allow create, update, delete: if isOrganizer();
+    }
+
+    match /schedules/{date} {
+      allow read: if true;
+      allow create, update, delete: if isOrganizer();
+    }
+
+    match /learningSchedules/{date} {
+      allow read, create, update, delete: if isOrganizer();
+    }
+
+    match /eveningArchive/{date} {
+      allow read, create, update, delete: if isOrganizer();
+    }
+
+    match /urgentCalls/{date} {
+      allow read: if true;
+      allow create, update, delete: if isOrganizer();
+    }
+
+    match /notificationDevices/{deviceId} {
+      allow read, create, update, delete: if isOrganizer();
+    }
+
+    match /urgentSignups/{signupId} {
+      allow read, create, update, delete: if isOrganizer();
+    }
+
+    match /logs/{logId} {
+      allow read, create, update, delete: if isOrganizer();
+    }
+
+    match /counters/{counterId} {
+      allow read, create, update, delete: if isOrganizer();
+    }
+
+    match /settings/{settingId} {
+      allow read: if settingId in ['noPlayDates', 'defaultCourts', 'forbiddenPairs'];
+      allow read, create, update, delete: if isOrganizer() && settingId != 'organizer';
+    }
+
+    // De PIN-hash wordt vanaf v2.3.6 uitsluitend door de Cloud Function gelezen/gewijzigd.
+    match /settings/organizer {
+      allow read, write: if false;
+    }
+
+    // Rate-limitgegevens en alle onbekende collecties zijn niet toegankelijk voor clients.
+    match /securityRateLimits/{docId} {
+      allow read, write: if false;
     }
   }
 }
