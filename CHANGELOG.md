@@ -1,5 +1,15 @@
 # Wijzigingen
 
+## v2.3.7
+
+- Optie **Singles toestaan** toegevoegd bij de deelnemersselectie.
+- Bijvoorbeeld 14 spelers kunnen nu op 4 banen worden ingedeeld als 3 dubbels en 1 single per ronde.
+- De automatische indeling probeert verschillende spelers voor de single in ronde 1 en ronde 2 te kiezen.
+- Handmatig indelen ondersteunt dezelfde combinatie van dubbels en één single.
+- WhatsApp-tekst **Nog plekken vrij** uitgebreid met: “Laat even weten of je erbij bent of niet. Graag een reactie!”
+- In de definitieve WhatsApp-indeling staat voortaan `-` in plaats van `tegen`.
+- Cache- en versieverwijzingen bijgewerkt naar v2.3.7.
+
 ## v2.3.6
 
 - Firestore Test Mode vervangen door permanente Security Rules.

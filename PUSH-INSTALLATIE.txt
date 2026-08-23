@@ -1,4 +1,4 @@
-PUSHMELDINGEN – VERSIE 2.3.6
+PUSHMELDINGEN – VERSIE 2.3.7
 
 De gewone webapp kan zonder map functions naar GitHub worden geüpload.
 

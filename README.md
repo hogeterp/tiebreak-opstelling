@@ -1,8 +1,15 @@
-# Supertiebreak-opstelling v2.3.6
+# Supertiebreak-opstelling v2.3.7
 
 Webapp voor de wekelijkse Supertiebreak bij TV Nieuw-Vennep.
 
-## Nieuw in v2.3.6
+## Nieuw in v2.3.7
+
+- Optioneel singles toestaan: bijvoorbeeld 14 spelers op 4 banen als 3 dubbels + 1 single.
+- Automatisch én handmatig indelen ondersteunen deze speelvorm.
+- WhatsApp-tekst bij vrije plekken vraagt expliciet om een reactie.
+- In de definitieve WhatsApp-indeling staat `-` tussen de teams.
+
+## Beveiliging uit v2.3.6
 
 - Firestore gebruikt permanente Security Rules in plaats van tijdelijke Test Mode-regels.
 - De organisator-PIN wordt veilig op de server gecontroleerd via Firebase Cloud Functions.

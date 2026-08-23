@@ -61,3 +61,12 @@ Supertiebreak-opstelling
 - [x] Firebase Auth custom claim voor organisatorrechten.
 - [x] Deelnemerwrites beperken tot geldige reacties.
 - [x] Pushmelding en archiefsync server-side afhandelen.
+
+
+## Afgerond in v2.3.7
+
+- [x] Optioneel singles toestaan bij selectie en indeling.
+- [x] 14 spelers op 4 banen mogelijk als 3 dubbels + 1 single.
+- [x] Handmatige indeling ondersteunt singlebanen.
+- [x] WhatsApp-tekst vrije plekken uitgebreid met expliciet reactieverzoek.
+- [x] `tegen` vervangen door `-` in de definitieve WhatsApp-indeling.

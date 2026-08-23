@@ -275,3 +275,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .reset-player-check .player-meta{display:block}
 .status-player-main{min-width:0}
 @media(max-width:520px){.smart-reset-grid{grid-template-columns:1fr}.smart-reset-grid .action-row button{width:100%}}
+
+
+/* v2.3.7 optionele singles */
+.single-option{display:flex;align-items:flex-start;gap:10px;margin:10px 0 4px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8faf9;cursor:pointer}
+.single-option input{width:auto;margin-top:3px;flex:0 0 auto}
+.single-option span{display:flex;flex-direction:column;gap:2px}
+.single-option small{font-weight:400;color:var(--gray);line-height:1.3}
+.selection-mode-note{margin:8px 0 2px;padding:7px 9px;border-radius:8px;background:var(--green2);color:var(--green);font-size:.8rem}
+.manual-grid.single-grid{grid-template-columns:1fr}

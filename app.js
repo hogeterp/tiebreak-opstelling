@@ -23,7 +23,7 @@ const functions = getFunctions(app);
 let messaging = null;
 try { messaging = getMessaging(app); } catch (_) {}
 const APP_URL = "https://hogeterp.github.io/tiebreak-opstelling/";
-const PUSH_SW_URL = "./sw.js?v=2.3.6";
+const PUSH_SW_URL = "./sw.js?v=2.3.7";
 
 const DEFAULT_SCORE_WEIGHTS = { rating:40, spread:2, mix:20, partner:20, opponent:6, four:10 };
 
@@ -525,8 +525,11 @@ async function automaticSelection(date) {
   if (!assertEditable(date)) return;
   const settings = await loadEveningSettings(date);
   const capacity = settings.courtCount * 4;
+  const allowSingles = Boolean($("allowSingles")?.checked);
   const candidates = sortedCandidates(date);
-  const playCount = Math.min(Math.floor(candidates.length / 4) * 4, capacity);
+  const playCount = allowSingles
+    ? Math.min(Math.floor(candidates.length / 2) * 2, capacity)
+    : Math.min(Math.floor(candidates.length / 4) * 4, capacity);
   const previous = state.selections[date] || {};
   const priorReserves = new Set(previous.reserveIds || []);
   candidates.sort((a,b) => {
@@ -536,10 +539,10 @@ async function automaticSelection(date) {
   });
   const playingIds = candidates.slice(0,playCount).map(p=>p.id);
   const reserveIds = candidates.slice(playCount).map(p=>p.id);
-  const selection = { playingIds, reserveIds, updatedAt:new Date().toISOString() };
+  const selection = { playingIds, reserveIds, allowSingles, updatedAt:new Date().toISOString() };
   state.selections[date] = selection;
   await setDoc(doc(db,"selections",date),selection);
-  await logAction("automatische_selectie", { date, playingIds, reserveIds });
+  await logAction("automatische_selectie", { date, playingIds, reserveIds, allowSingles });
   renderSelectionSummary(date);
 }
 
@@ -549,8 +552,12 @@ function renderSelectionSummary(date) {
     $("selectionSummary").innerHTML = '<p>Nog geen selectie gemaakt.</p>'; return;
   }
   const names = ids => ids.map(id => state.players.find(p=>p.id===id)).filter(Boolean).map(displayName);
+  const singlesNote = s.allowSingles && s.playingIds.length % 4 === 2
+    ? `<p class="selection-mode-note">🎾 Singles toegestaan: ${Math.floor(s.playingIds.length/4)} dubbel${Math.floor(s.playingIds.length/4)===1?"":"s"} + 1 single per ronde.</p>`
+    : "";
   $("selectionSummary").innerHTML = `
     <h3>Speelt (${s.playingIds.length})</h3><div class="name-chips">${names(s.playingIds).map(n=>`<span class="name-chip">${escapeHtml(n)}</span>`).join("")}</div>
+    ${singlesNote}
     <h3>Reserve (${s.reserveIds.length})</h3><div class="name-chips">${names(s.reserveIds).map(n=>`<span class="name-chip">${escapeHtml(n)}</span>`).join("") || "<span>Geen reserves</span>"}</div>`;
 }
 
@@ -569,11 +576,16 @@ async function saveSelectionEditor() {
   if (!assertEditable(date)) return;
   const settings = await loadEveningSettings(date);
   const checked = [...$("selectionEditor").querySelectorAll("input:checked")].map(x=>x.value);
-  if (checked.length % 4 !== 0 || checked.length > settings.courtCount * 4) {
-    alert(`Kies een veelvoud van 4, maximaal ${settings.courtCount*4}.`); return;
+  const allowSingles = Boolean($("allowSingles")?.checked);
+  const validCount = allowSingles ? checked.length >= 2 && checked.length % 2 === 0 : checked.length % 4 === 0;
+  if (!validCount || checked.length > settings.courtCount * 4) {
+    alert(allowSingles
+      ? `Kies een even aantal spelers, maximaal ${settings.courtCount*4}.`
+      : `Kies een veelvoud van 4, maximaal ${settings.courtCount*4}.`);
+    return;
   }
   const candidates = sortedCandidates(date).map(p=>p.id);
-  const selection = { playingIds:checked, reserveIds:candidates.filter(id=>!checked.includes(id)), updatedAt:new Date().toISOString() };
+  const selection = { playingIds:checked, reserveIds:candidates.filter(id=>!checked.includes(id)), allowSingles, updatedAt:new Date().toISOString() };
   state.selections[date] = selection;
   await setDoc(doc(db,"selections",date),selection);
   $("selectionDialog").close();
@@ -821,6 +833,91 @@ function createSmartSchedule(players,courts,history,weights=state.scoreWeights) 
   return best;
 }
 
+function scoreSingleMatch(pair, history, previousSingleIds=new Set(), previousSingleKey="", weights=state.scoreWeights) {
+  const [a,b]=pair;
+  let score=Math.abs(Number(a.rating??9)-Number(b.rating??9))*Number(weights.rating||40);
+  score+=(history.opponentCounts.get(pairKey(a.id,b.id))||0)*Number(weights.opponent||6);
+  const key=pairKey(a.id,b.id);
+  if(previousSingleKey && key===previousSingleKey) score+=100000;
+  if(previousSingleIds.has(a.id)) score+=90;
+  if(previousSingleIds.has(b.id)) score+=90;
+  return score;
+}
+
+function singleCourtFromRound(round) {
+  return (round||[]).find(court=>(court.team1||[]).length===1 && (court.team2||[]).length===1) || null;
+}
+
+function makeMixedRoundCandidate(players,courts,history,previousRound=null,weights=state.scoreWeights) {
+  const shuffled=shuffleCopy(players);
+  const singlesNeeded=shuffled.length%4===2;
+  const doubleCourtCount=Math.floor(shuffled.length/4);
+  const neededCourts=doubleCourtCount+(singlesNeeded?1:0);
+  if(courts.length<neededCourts) return null;
+
+  const previous=previousRound ? roundKeys(previousRound) : {pairKeys:new Set(),fourKeys:new Set()};
+  const previousSingle=singleCourtFromRound(previousRound);
+  const previousSingleIds=new Set(previousSingle?.players||[]);
+  const previousSingleKey=previousSingle ? pairKey(previousSingle.team1[0],previousSingle.team2[0]) : "";
+  const round=[];
+  let score=0;
+
+  for(let i=0;i<doubleCourtCount;i++){
+    const group=shuffled.slice(i*4,i*4+4);
+    if(group.length<4 || courtHasForbiddenPair(group.map(p=>p.id))) return null;
+    let best=null;
+    allPairings(group).forEach(pairing=>{
+      const pairingScore=scoreMatch(pairing,history,previous.pairKeys,previous.fourKeys,weights);
+      if(!best || pairingScore<best.score) best={pairing,score:pairingScore};
+    });
+    if(!best) return null;
+    score+=best.score;
+    round.push({
+      court:courts[i],
+      format:"double",
+      players:group.map(p=>p.id),
+      team1:best.pairing.team1.map(p=>p.id),
+      team2:best.pairing.team2.map(p=>p.id)
+    });
+  }
+
+  if(singlesNeeded){
+    const pair=shuffled.slice(doubleCourtCount*4,doubleCourtCount*4+2);
+    if(pair.length!==2 || courtHasForbiddenPair(pair.map(p=>p.id))) return null;
+    score+=scoreSingleMatch(pair,history,previousSingleIds,previousSingleKey,weights);
+    round.push({
+      court:courts[doubleCourtCount],
+      format:"single",
+      players:pair.map(p=>p.id),
+      team1:[pair[0].id],
+      team2:[pair[1].id]
+    });
+  }
+  return {round,score};
+}
+
+function createSmartMixedSchedule(players,courts,history,weights=state.scoreWeights) {
+  let best=null;
+  let examined=0;
+  const iterations=Math.max(2600,players.length*300);
+  for(let i=0;i<iterations;i++){
+    const first=makeMixedRoundCandidate(players,courts,history,null,weights);
+    if(!first) continue;
+    const second=makeMixedRoundCandidate(players,courts,history,first.round,weights);
+    if(!second || hasDuplicatePairAcrossRounds(first.round,second.round)) continue;
+    const firstSingle=singleCourtFromRound(first.round);
+    const secondSingle=singleCourtFromRound(second.round);
+    if(firstSingle && secondSingle && pairKey(firstSingle.team1[0],firstSingle.team2[0])===pairKey(secondSingle.team1[0],secondSingle.team2[0])) continue;
+    examined++;
+    const total=first.score+second.score;
+    if(!best || total<best.score) best={round1:first.round,round2:second.round,score:total};
+  }
+  if(!best) throw new Error("Er kon geen geldige indeling met dubbels en single worden gevonden.");
+  best.examined=examined;
+  best.quality=evaluateScheduleQuality(best.round1,best.round2,history);
+  return best;
+}
+
 function clampScore(value){ return Math.max(0,Math.min(100,Math.round(value))); }
 
 function evaluateScheduleQuality(round1,round2,history){
@@ -855,7 +952,7 @@ async function automaticSchedule(date) {
   const output = $("scheduleOutput");
   try {
     const selection = state.selections[date];
-    if (!selection || selection.playingIds.length < 4) {
+    if (!selection || selection.playingIds.length < 2) {
       alert("Maak eerst een deelnemersselectie.");
       return;
     }
@@ -866,20 +963,30 @@ async function automaticSchedule(date) {
       .filter(Boolean);
 
     const availableCourts = Array.isArray(settings.courts) ? settings.courts : [];
-    const groupCount = Math.min(availableCourts.length, Math.floor(players.length / 4));
-    if (groupCount < 1) throw new Error("Kies eerst minimaal één baan bij Speelavond.");
-
-    const scheduledPlayers=players.slice(0,groupCount*4);
-    if(scheduledPlayers.length!==players.length){
-      throw new Error("Het aantal geselecteerde spelers past niet precies op het aantal beschikbare banen.");
+    const allowSingles = Boolean(selection.allowSingles);
+    const remainder=players.length%4;
+    if(!allowSingles && remainder!==0){
+      throw new Error("Het aantal geselecteerde spelers moet een veelvoud van 4 zijn, of zet ‘Singles toestaan’ aan.");
+    }
+    if(allowSingles && ![0,2].includes(remainder)){
+      throw new Error("Met singles toegestaan moet het aantal geselecteerde spelers even zijn.");
+    }
+    const groupCount=Math.floor(players.length/4)+(remainder===2?1:0);
+    if(groupCount < 1) throw new Error("Kies eerst minimaal één baan bij Speelavond.");
+    if(groupCount>availableCourts.length){
+      throw new Error("Er zijn niet genoeg geselecteerde banen voor deze spelers.");
     }
 
+    const scheduledPlayers=players;
     output.innerHTML='<div class="message"><strong>Slimme indeling wordt berekend…</strong><br>De app vergelijkt veel mogelijke combinaties.</div>';
     await new Promise(resolve=>setTimeout(resolve,20));
 
     const courts=availableCourts.slice(0,groupCount);
     const history=buildHistory("all",date);
-    const smart=createSmartSchedule(scheduledPlayers,courts,history,state.scoreWeights);
+    const mixedMode=allowSingles && remainder===2;
+    const smart=mixedMode
+      ? createSmartMixedSchedule(scheduledPlayers,courts,history,state.scoreWeights)
+      : createSmartSchedule(scheduledPlayers,courts,history,state.scoreWeights);
     const sortedRound1=sortCourtsByConfiguredOrder(smart.round1,settings.courts);
     const sortedRound2=sortCourtsByConfiguredOrder(smart.round2,settings.courts);
 
@@ -889,7 +996,8 @@ async function automaticSchedule(date) {
       round2:sortedRound2,
       createdAt:new Date().toISOString(),
       mode:"automatic",
-      algorithm:"historical-score-v2",
+      algorithm:mixedMode?"historical-score-v3-singles":"historical-score-v2",
+      allowSingles,
       score:Math.round(smart.score*10)/10,
       examined:smart.examined,
       quality:smart.quality,
@@ -900,7 +1008,8 @@ async function automaticSchedule(date) {
       scheduleJson:JSON.stringify(schedule),
       date,
       mode:"automatic",
-      algorithm:"historical-score-v2",
+      algorithm:schedule.algorithm,
+      allowSingles,
       score:schedule.score,
       examined:schedule.examined,
       updatedAt:serverTimestamp()
@@ -909,7 +1018,7 @@ async function automaticSchedule(date) {
     state.schedules[date]=schedule;
     await saveLearningRecord(date,sortedRound1,sortedRound2,"automatic");
     await saveArchiveSnapshot(date);
-    await logAction("automatische_indeling",{date,algorithm:"historical-score-v2",score:schedule.score});
+    await logAction("automatische_indeling",{date,algorithm:schedule.algorithm,allowSingles,score:schedule.score});
     renderSchedule(date);
   } catch (error) {
     console.error("Automatische indeling mislukt:",error);
@@ -1013,13 +1122,19 @@ async function renderSchedule(date) {
 async function openManualEditor(date) {
   if (!assertEditable(date)) return;
   const selection=state.selections[date];
-  if (!selection || selection.playingIds.length<4){
+  if (!selection || selection.playingIds.length<2){
     alert("Maak eerst een deelnemersselectie.");
     return;
   }
 
   const settings=await loadEveningSettings(date,true);
-  const courtCount=Math.min(settings.courts.length,Math.floor(selection.playingIds.length/4));
+  const allowSingles=Boolean(selection.allowSingles);
+  const remainder=selection.playingIds.length%4;
+  if(!allowSingles && remainder!==0){ alert("Deze selectie past niet in alleen dubbels."); return; }
+  if(allowSingles && ![0,2].includes(remainder)){ alert("Kies een even aantal spelers als singles zijn toegestaan."); return; }
+  const doubleCourtCount=Math.floor(selection.playingIds.length/4);
+  const courtCount=doubleCourtCount+(remainder===2?1:0);
+  if(courtCount>settings.courts.length){ alert("Er zijn niet genoeg banen geselecteerd."); return; }
   const courts=settings.courts.slice(0,courtCount);
   const playerOptions=selection.playingIds
     .map(id=>`<option value="${id}">${escapeHtml(displayName(playerById(id)))}</option>`)
@@ -1035,29 +1150,30 @@ async function openManualEditor(date) {
         <div class="manual-round-courts">
           ${courts.map((court,index)=>{
             const existingCourt=(roundData||[]).find(item=>Number(item.court)===Number(court));
+            const isSingle=allowSingles && remainder===2 && index===courts.length-1;
             const team1=existingCourt?.team1||[];
             const team2=existingCourt?.team2||[];
-            const values=[team1[0]||"",team1[1]||"",team2[0]||"",team2[1]||""];
-
+            const format=isSingle?"single":"double";
+            const label=isSingle?"Single":"Dubbel";
             return `
-              <div class="manual-court" data-round="${roundNumber}" data-court="${court}">
-                <strong>Baan ${court}</strong>
+              <div class="manual-court" data-round="${roundNumber}" data-court="${court}" data-format="${format}">
+                <strong>Baan ${court} · ${label}</strong>
 
                 <div class="manual-team">
-                  <span class="manual-team-label">Team 1</span>
-                  <div class="manual-grid">
+                  <span class="manual-team-label">${isSingle?"Speler 1":"Team 1"}</span>
+                  <div class="manual-grid ${isSingle?"single-grid":""}">
                     <select data-slot="0">${emptyOption}${playerOptions}</select>
-                    <select data-slot="1">${emptyOption}${playerOptions}</select>
+                    ${isSingle?"":`<select data-slot="1">${emptyOption}${playerOptions}</select>`}
                   </div>
                 </div>
 
                 <div class="vs-line manual-vs">-</div>
 
                 <div class="manual-team">
-                  <span class="manual-team-label">Team 2</span>
-                  <div class="manual-grid">
-                    <select data-slot="2">${emptyOption}${playerOptions}</select>
-                    <select data-slot="3">${emptyOption}${playerOptions}</select>
+                  <span class="manual-team-label">${isSingle?"Speler 2":"Team 2"}</span>
+                  <div class="manual-grid ${isSingle?"single-grid":""}">
+                    <select data-slot="${isSingle?1:2}">${emptyOption}${playerOptions}</select>
+                    ${isSingle?"":`<select data-slot="3">${emptyOption}${playerOptions}</select>`}
                   </div>
                 </div>
               </div>`;
@@ -1075,14 +1191,12 @@ async function openManualEditor(date) {
     const courtNumber=Number(card.dataset.court);
     const roundData=roundNumber===1?existing?.round1:existing?.round2;
     const existingCourt=(roundData||[]).find(item=>Number(item.court)===courtNumber);
-    const values=[
-      existingCourt?.team1?.[0]||"",
-      existingCourt?.team1?.[1]||"",
-      existingCourt?.team2?.[0]||"",
-      existingCourt?.team2?.[1]||""
-    ];
+    const isSingle=card.dataset.format==="single";
+    const values=isSingle
+      ? [existingCourt?.team1?.[0]||"",existingCourt?.team2?.[0]||""]
+      : [existingCourt?.team1?.[0]||"",existingCourt?.team1?.[1]||"",existingCourt?.team2?.[0]||"",existingCourt?.team2?.[1]||""];
     [...card.querySelectorAll("select")].forEach((select,index)=>{
-      select.value=values[index];
+      select.value=values[index]||"";
       select.addEventListener("change",()=>{
         updateManualSelectOptions(roundNumber);
         validateManualEditor();
@@ -1101,10 +1215,12 @@ function readManualRound(roundNumber) {
   const cards=[...$("manualEditor").querySelectorAll(`.manual-court[data-round="${roundNumber}"]`)];
   return cards.map(card=>{
     const values=[...card.querySelectorAll("select")].map(select=>select.value);
+    const isSingle=card.dataset.format==="single";
     return {
       court:Number(card.dataset.court),
-      team1:[values[0],values[1]],
-      team2:[values[2],values[3]],
+      format:isSingle?"single":"double",
+      team1:isSingle?[values[0]]:[values[0],values[1]],
+      team2:isSingle?[values[1]]:[values[2],values[3]],
       players:values
     };
   });
@@ -1161,17 +1277,24 @@ function validateManualEditor() {
 
   if (!problems.length) {
     const history=buildHistory("all",date);
-    const round1Pairs=new Set(rounds[1].flatMap(c=>[pairKey(...c.team1),pairKey(...c.team2)]));
+    const round1Pairs=new Set(rounds[1].flatMap(c=>[c.team1,c.team2].filter(team=>team.length===2).map(team=>pairKey(...team))));
     rounds[2].forEach(court=>{
-      [court.team1,court.team2].forEach(team=>{
+      [court.team1,court.team2].filter(team=>team.length===2).forEach(team=>{
         if(round1Pairs.has(pairKey(...team))) warnings.push(`${teamText(team)} speelt in beide rondes samen.`);
       });
     });
 
-    const round1Fours=new Set(rounds[1].map(c=>fourKey(c.players)));
-    rounds[2].forEach(court=>{
+    const round1Fours=new Set(rounds[1].filter(c=>c.players.length===4).map(c=>fourKey(c.players)));
+    rounds[2].filter(c=>c.players.length===4).forEach(court=>{
       if(round1Fours.has(fourKey(court.players))) warnings.push(`Dezelfde vier spelers staan in beide rondes tegenover elkaar op baan ${court.court}.`);
     });
+    const firstSingle=singleCourtFromRound(rounds[1]);
+    const secondSingle=singleCourtFromRound(rounds[2]);
+    if(firstSingle && secondSingle){
+      const firstIds=new Set(firstSingle.players);
+      const repeated=secondSingle.players.filter(id=>firstIds.has(id));
+      if(repeated.length) warnings.push(`Single: ${repeated.map(id=>displayName(playerById(id))).join(" en ")} speelt in beide rondes single.`);
+    }
 
     [1,2].forEach(roundNumber=>rounds[roundNumber].forEach(court=>{
       if(courtHasForbiddenPair(court.players)) {
@@ -1185,7 +1308,7 @@ function validateManualEditor() {
         }
         warnings.push(`Baan ${court.court}, ronde ${roundNumber}: niet-samen-combinatie: ${conflicts.join(", ")}.`);
       }
-      [court.team1,court.team2].forEach(team=>{
+      [court.team1,court.team2].filter(team=>team.length===2).forEach(team=>{
         const count=countWith(history.partnerCounts,team[0],team[1]);
         if(count>0) warnings.push(`${teamText(team)} speelde historisch al ${count}× samen.`);
       });
@@ -1237,16 +1360,9 @@ function buildLearningRecord(date, round1, round2) {
       court:Number(court.court),
       team1:[...court.team1],
       team2:[...court.team2],
-      teammatePairs:[
-        [...court.team1],
-        [...court.team2]
-      ],
-      opponentPairs:[
-        [court.team1[0],court.team2[0]],
-        [court.team1[0],court.team2[1]],
-        [court.team1[1],court.team2[0]],
-        [court.team1[1],court.team2[1]]
-      ]
+      format:(court.team1||[]).length===1 && (court.team2||[]).length===1 ? "single" : "double",
+      teammatePairs:[court.team1,court.team2].filter(team=>team.length===2).map(team=>[...team]),
+      opponentPairs:(court.team1||[]).flatMap(a=>(court.team2||[]).map(b=>[a,b]))
     }));
   }
 
@@ -1329,6 +1445,7 @@ async function renderSchedulePanel() {
   fillDateSelects();
   const date=$("scheduleDateSelect").value||state.dates[0];
   $("scheduleDateSelect").value=date;
+  if($("allowSingles")) $("allowSingles").checked=Boolean(state.selections[date]?.allowSingles);
   renderSelectionSummary(date);
   renderSchedule(date);
 }
@@ -1544,6 +1661,7 @@ async function buildMessage(type,date) {
       "Supertiebreak-opstelling","",
       `Er ${free===1?"is":"zijn"} nog ${free} ${free===1?"plaats":"plaatsen"} beschikbaar voor ${shortDate.toLowerCase()}.`,"",
       "Lijkt het je leuk om mee te spelen? Meld je dan aan via de app.","",
+      "Laat even weten of je erbij bent of niet. Graag een reactie!","",
       appText
     ].join("\n");
   }
@@ -1604,7 +1722,7 @@ async function buildMessage(type,date) {
     ];
     [["Supertie Ronde 1",schedule.round1],["Supertie Ronde 2",schedule.round2]].forEach(([label,round])=>{
       lines.push(label);
-      round.forEach(c=>lines.push(`Baan ${c.court}: ${teamText(c.team1)} tegen ${teamText(c.team2)}`));
+      round.forEach(c=>lines.push(`Baan ${c.court}: ${teamText(c.team1)} - ${teamText(c.team2)}`));
       lines.push("");
     });
     if (selection?.reserveIds?.length) lines.push(`Reserve: ${selection.reserveIds.map(id=>displayName(playerById(id))).join(", ")}`);
@@ -2148,6 +2266,16 @@ function attachEvents() {
       hideMessage($("courtMessage"));
     }
     renderCourtPicker(current);
+  };
+  $("allowSingles").onchange=async()=>{
+    const date=$("scheduleDateSelect").value;
+    const selection=state.selections[date];
+    if(selection){
+      selection.allowSingles=Boolean($("allowSingles").checked);
+      selection.updatedAt=new Date().toISOString();
+      await setDoc(doc(db,"selections",date),selection,{merge:true});
+      renderSelectionSummary(date);
+    }
   };
   $("autoSelection").onclick=()=>automaticSelection($("scheduleDateSelect").value);
   $("manualSelection").onclick=()=>openSelectionEditor($("scheduleDateSelect").value);

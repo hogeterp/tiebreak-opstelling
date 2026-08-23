@@ -1,13 +1,13 @@
-SUPERTIEBREAK v2.3.6 – FIRESTORE BEVEILIGING
+SUPERTIEBREAK v2.3.7 – FIRESTORE BEVEILIGING
 
 WAAROM DEZE VERSIE
-De oude Firestore Test Mode-regels verlopen. v2.3.6 gebruikt permanente Security Rules en veilige organisator-authenticatie via een Firebase Cloud Function.
+De beveiliging uit v2.3.6 blijft in v2.3.7 ongewijzigd: permanente Security Rules en veilige organisator-authenticatie via een Firebase Cloud Function.
 
 BELANGRIJK: VOLGORDE
 Publiceer NIET eerst de strenge Firestore-regels. Anders kan de oude webapp stoppen met werken.
 
 1. Deploy eerst Firebase-backend-v2.3.6.
-2. Upload daarna Supertiebreak-opstelling-v2.3.6 naar GitHub Pages.
+2. Upload daarna Supertiebreak-opstelling-v2.3.7 naar GitHub Pages.
 3. Test of de organisator met de bestaande 4-cijferige PIN kan inloggen.
 4. Test of een deelnemer Ja/Misschien/Nee kan kiezen.
 5. Publiceer PAS DAN firestore.rules in Firebase Console > Firestore Database > Regels.
